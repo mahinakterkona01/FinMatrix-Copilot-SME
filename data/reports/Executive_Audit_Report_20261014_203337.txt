@@ -1,0 +1,27 @@
+
+================================================================================
+                    FinMatrix Copilot— EXECUTIVE FINANCIAL AUDIT REPORT
+================================================================================
+Generated On: 2026-10-14 20:33:37
+Target Entity: SME Business Partner
+Benchmarked Currency: USD ($) / BDT (৳)
+--------------------------------------------------------------------------------
+
+1. LIQUIDITY & OPERATIONAL RUNWAY AUDIT
+   - Net Monthly Cash Flow : 7,000.00
+   - Operating Margin       : 28.0%
+   - Monthly Burn Rate      : 0.00
+   - Estimated Runway       : 999.0 Months
+   - Health Classification  : Healthy
+
+2. INVOICE CREDIT RISK ASSESSMENT
+   - Exposure Risk Score    : 0.45 / 1.0
+   - Risk Classification    : Medium
+
+3. COMPLIANCE & GOVERNANCE NOTE
+   - Guardrail Model        : Level-1 Temporal Protection Active
+   - RAG Verification       : Grounded against Official Regulatory Circulars
+
+================================================================================
+                            END OF EXECUTIVE REPORT
+================================================================================
