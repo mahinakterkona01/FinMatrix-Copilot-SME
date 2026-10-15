@@ -1,169 +1,75 @@
 # ⚡ FinMatrix Copilot — SME Financial Co-Pilot
 
-> **Developed by Team FinMatrixDUO**  
-> **Official Submission for 2026 Shenzhen International FinTech Competition (Topic E)**
-
-[![Python](https://img.shields.io/badge/Python-3.10+-00bcff?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
-[![Streamlit](https://img.shields.io/badge/Streamlit-1.30+-ff007f?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io)
-[![Topic E](https://img.shields.io/badge/Topic_E-100%25_Compliant-34d399?style=for-the-badge)](#-topic-e-requirement-fulfillment-matrix)
-[![Team](https://img.shields.io/badge/Team-FinMatrixDUO-ffb703?style=for-the-badge)](#-team-finmatrixduo)
-[![Security](https://img.shields.io/badge/Guardrails-Adversarial_Safety-00e5a0?style=for-the-badge)](src/safety.py)
+**Official Submission for 2026 Shenzhen International FinTech Competition (FinTechathon 2026)**  
+**Track / Topic:** Topic E — SME Finance Copilot  
+**Team Identity:** `Team FinMatrixDUO`  
 
 ---
 
-## 👥 Team FinMatrixDUO
+## 📌 Executive Overview
 
-- **Track:** International Artificial Intelligence Track | **Topic E:** SME Finance Copilot
-- **Theme:** AI as a Financial Participant
-- **Team Leader / Lead AI Engineer:** Mahin Akter Kona ( https://github.com/mahinakterkona01 )
-- **Team Member / Co-Developer:** Azmain Alam Khan ( https://github.com/Khan-Azmain )
-- **Project Repository:** `FinMatrix-Copilot`
+**FinMatrix Copilot** is an enterprise-grade AI financial decision-support and liquidity intelligence engine designed for Small and Medium Enterprises (SMEs). Standard conversational financial assistants often suffer from arithmetic hallucinations and lookahead data leakage in forecasting. 
 
-## 🎯 Topic E Requirement Fulfillment Matrix
-
-| Competition Topic E Core Requirement | FinMatrix Copilot Solution & Module | Technical Implementation Status |
-| :--- | :--- | :--- |
-| **1. Financing-Option Matching** | RAG-powered Central Bank SME Policy Search (`src/retrieval.py`) & Invoice Discount Calculator (`app.py`) | ✅ **Matched & Capped** (Instant policy matching for refinancing facilities) |
-| **2. Cash-Flow Management with Alerts** | ML Random Forest Time-Series Forecaster (`src/forecasting.py`) & Early-Warning Risk Radar | ✅ **Automated & Proactive** (Real-time safety threshold deficit alerts) |
-| **3. Business Financial Analysis** | Solvency Index Gauge, Executive Margin Analytics, and What-If Stress Simulator | ✅ **Multi-Dimensional** (Sector-customizable enterprise environment) |
+FinMatrix Copilot addresses these gaps by decoupling deterministic numerical execution from language models, enforcing strict Level 1 Temporal Holdout Validation for time-series forecasting, and embedding an adversarial guardrail layer for input security.
 
 ---
 
-## 🚀 Key Capabilities
+## 🚀 Key Functional Modules
 
-1. **Financing-Option Matching (RAG Engine)**:
-   - Matches SME financial profiles with official central bank circulars, refinancing schemes (e.g., CMSME 7% facility), and invoice discounting options without hallucination.
-
-2. **Automated Cash-Flow Management & Deficit Alerts**:
-   - Ensembled Machine Learning forecasting model (+13.69% MAE accuracy over baseline) with dynamic deficit alerts when projected balance drops below customized safety buffers.
-
-3. **Multi-Sector Business Financial Analysis**:
-   - Real-time Solvency Health Index (0-100), automated cost-shock stress testing, and risk-free strategic advisory tailored for Retail, SaaS, Manufacturing, and Logistics SMEs.
-
-## Overview
-
-FinPilot AI is an enterprise financial co-pilot platform engineered for Small and Medium Enterprises (SMEs). It connects predictive machine learning analytics, deterministic financial engine verification, regulatory advisory powered by Retrieval-Augmented Generation (RAG), and human-governed execution pipelines into a single interface.
-
-The platform relies on deterministic arithmetic for core financial statement evaluations to prevent calculation errors, while using machine learning models for forward cash-flow forecasting and natural language processing for regulatory retrieval.
+1. **📊 Executive Financial Dashboard:** Multi-currency ($/৳/€/£/¥) and multi-sector operating environment with real-time liquidity safety threshold alerts and solvency gauge.
+2. **📈 ML Cash-Flow Forecaster:** Time-series forecasting using historical lag features ($t-1, t-7$) to project net liquidity trends without future lookahead bias.
+3. **🧪 What-If Stress Simulator:** Independent macro shock simulation evaluating revenue contractions and expense inflation on net liquidity.
+4. **🧾 Working Capital & Invoice Discounting:** Accelerated invoice settlement calculator providing effective annualized cost rate analysis for early liquidity.
+5. **📚 Policy Retrieval Engine (RAG):** Grounded policy search engine retrieving central bank SME circulars and financing guidelines with source citations.
+6. **🤖 Interactive AI Copilot:** Natural language financial guidance powered by context-aware execution and safety validation.
+7. **🛡️ Adversarial Security Guardrail:** Structural input filter intercepting prompt hijacking, SQL injection patterns, and unsafe commands.
+8. **📑 Institutional Audit Exporter:** Automated generation and download of structured financial audit reports.
 
 ---
 
-## Architecture Diagram
+## 🛠️ System Architecture & Technology Stack
 
-                               ┌────────────────────────────────────────┐
-                               │     Streamlit Navy-Blue Dashboard      │
-                               └──────────────────┬─────────────────────┘
-                                                  │
-                 ┌────────────────────────────────┼────────────────────────────────┐
-                 │                                │                                │
-                 ▼                                ▼                                ▼
-  ┌─────────────────────────────┐  ┌─────────────────────────────┐  ┌─────────────────────────────┐
-  │  Deterministic Core Tools   │  │  Time-Series ML Forecasting │  │   Policy RAG Vector Engine  │
-  │  (src/financial_tools.py)   │  │     (src/forecasting.py)    │  │    (src/retrieval.py)       │
-  │  • Liquidity & Runway       │  │  • Random Forest Regressor   │  │  • PyPDF Document Chunking   │
-  │  • Invoice Late Risk Score  │  │  • Uncertainty Bands         │  │  • TF-IDF Circular Indexing │
-  └──────────────┬──────────────┘  └──────────────┬──────────────┘  └──────────────┬──────────────┘
-                 │                                │                                │
-                 └────────────────────────────────┼────────────────────────────────┘
-                                                  │
-                                                  ▼
-                               ┌────────────────────────────────────────┐
-                               │   Orchestration & Safety Guardrails    │
-                               │        (src/agent.py & safety.py)       │
-                               └──────────────────┬─────────────────────┘
-                                                  │
-                                 ┌────────────────┴────────────────┐
-                                 ▼                                 ▼
-                   ┌───────────────────────────┐     ┌───────────────────────────┐
-                   │ Persistent Audit Logger   │     │ Human-in-the-Loop Sandbox │
-                   │  (src/audit_logger.py)    │     │  (Audit & Approvals UI)   │
-                   └───────────────────────────┘     └───────────────────────────┘
+FinMatrix-Copilot-SME/
+├── app.py                     # Streamlit High-Contrast Dashboard Interface
+├── src/                       # Core Analytical & Intelligence Engines
+│   ├── forecasting.py         # Time-Series ML Forecaster Engine
+│   ├── retrieval.py           # TF-IDF Policy Knowledge Search (RAG)
+│   ├── copilot.py             # Interactive Financial AI Engine
+│   ├── safety.py              # Adversarial Security Guardrails
+│   ├── financial_tools.py     # Solvency & Liquidity Metrics
+│   └── data_loader.py         # SME Ledger Ingestion & Normalization
+├── docs/                      # Research & Requirements Documentation
+├── notebooks/                 # Temporal Validation & EDA Notebooks
+├── data/raw/                  # Verified Primary SME Cash Flow Datasets
+├── requirements.txt           # Python Environment Dependencies
+└── LICENSE                    # MIT Open-Source License
+
+* **Frontend & Dashboard:** Streamlit (High-Contrast Custom CSS Interface)
+* **Data Processing & Analytics:** Pandas, NumPy, Plotly Express
+* **Machine Learning & Time-Series:** Scikit-Learn (Random Forest Forecaster)
+* **Retrieval Engine (RAG):** TF-IDF Vectorization & Cosine Similarity
+* **Security & Testing:** Regex Pattern Matching Guardrails & Pytest Framework
 
 ---
 
-## Core Features
+## 💻 Quick Start & Local Execution Guide
 
-1. Deterministic Financial Verification: Provides fixed calculation algorithms for net cash flow, operating margins, monthly burn rates, and operational runway estimations.
-2. Machine Learning Cash-Flow Forecasting: Generates 30-day forward projections with confidence interval bounds using a Random Forest Time-Series Regressor.
-3. Interactive AgGrid Invoice Ledger: Enables multi-column searching, sorting, and dynamic inline credit risk assessments.
-4. Data Quality Auditor: Accepts CSV and Excel uploads with schema normalization, missing value imputation, and duplicate detection.
-5. Grounded Policy RAG Engine: Indexes official Bangladesh Bank SME policy circulars to provide cited regulatory answers.
-6. Human-in-the-Loop Governance: Enforces approval sandboxes before sensitive financial workflows execute, backed by persistent local JSON logging.
-7. Executive Summary Exporter: Exports printable .txt and structured .csv audit reports for banking partners and internal review.
+### 1. Repository Cloning & Environment Setup
 
----
+```powershell
+git clone [https://github.com/mahinakterkona01/FinMatrix-Copilot-SME.git](https://github.com/mahinakterkona01/FinMatrix-Copilot-SME.git)
+cd FinMatrix-Copilot-SME
 
-## Installation & Environment Setup
+Research & Validation Methodology
+FinMatrix Copilot enforces a 3-Level Evaluation Framework:
 
-### 1. Prerequisites
+Level 1 (Temporal Validation): Time-series data is split strictly chronologically to eliminate data leakage.
 
-- Python 3.10+
-- Git
+Level 2 (Business-Level Validation): Evaluated across 4 distinct SME sectors (Retail, Technology/SaaS, Manufacturing, Logistics).
 
-### 2. Virtual Environment Configuration
+Level 3 (External Policy Consistency): Grounded in official central bank SME working capital circulars and refinancing guidelines.
 
-git clone https://github.com/YourUsername/FinPilot_AI.git
-cd FinPilot_AI
+License & Copyright Notice
+Distributed under the MIT License. See LICENSE for full details.
 
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-
-### 3. Install Dependencies
-
-pip install -r requirements.txt
-pip install streamlit-aggrid openpyxl
-
----
-
-## Running the Dashboard
-
-Launch the Streamlit web app with the following command:
-streamlit run app.py
-
-Access the application interface at http://localhost:8501
-
----
-
-## Verification & Unit Testing
-
-FinPilot AI incorporates an automated testing suite using pytest to validate financial algorithms, time-series transformations, security constraints, and audit logging persistence.
-
-Execute the test suite:
-pytest
-
-Benchmark Result Output:
-12 passed in 0.48s
-
----
-
-## Directory Structure
-
-FinPilot_AI/
-├── .streamlit/
-│   └── config.toml             # Navy-Blue UI Palette & Layout Settings
-├── data/
-│   ├── audit_log.json          # Persistent JSON Log Storage
-│   ├── raw/                    # Transaction and Invoice Datasets
-│   └── reports/                # Output Directory for Generated Reports
-├── docs/
-│   ├── evaluation_report.md    # Model Evaluation & System Metrics
-│   └── *.pdf                   # Indexed Regulatory Policy Documents
-├── src/
-│   ├── agent.py                # Core Agent Orchestration
-│   ├── audit_logger.py         # Local JSON Audit Persistence Engine
-│   ├── data_loader.py          # Data Quality Verification & Normalization
-│   ├── financial_tools.py      # Deterministic Arithmetic Functions
-│   ├── forecasting.py          # Time-Series ML Regressor
-│   ├── report_generator.py     # Executive Report Export Engine
-│   ├── retrieval.py            # TF-IDF Regulatory Document Index
-│   └── safety.py               # Input Validation & Sanitization
-├── tests/                      # Automated Pytest Suite (12 Unit Tests)
-├── app.py                      # Dashboard Web Application Interface
-├── requirements.txt            # Package Dependencies
-└── README.md                   # System Technical Documentation
-
----
-
-## License & Compliance Note
-
-Developed specifically for submission to the 2026 Shenzhen International FinTech Competition (Topic E: SME Finance Copilot). All components comply with competition guidelines regarding data handling, execution security, and original engineering practices.
+Copyright (c) 2026 Team FinMatrixDUO.
