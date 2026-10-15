@@ -1,5 +1,5 @@
 """
-FinPilot AI — RAG Retrieval & Knowledge Base Engine
+FinMatrix Copilot— RAG Retrieval & Knowledge Base Engine
 Parses Bangladesh Bank CMSME circulars (PDFs/Text) and builds a citation-grounded index.
 Handles encoding filters for clean policy search.
 """

@@ -1,5 +1,5 @@
 """
-FinPilot AI — Persistent Audit Logging Engine
+FinMatrix Copilot— Persistent Audit Logging Engine
 Stores user interactions, approval decisions, dataset uploads, and system events
 to local JSON storage for compliance and auditability.
 """

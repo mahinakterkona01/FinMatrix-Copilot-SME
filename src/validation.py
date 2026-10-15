@@ -1,5 +1,5 @@
 """
-FinPilot AI — Data Ingestion & Quality Validation Engine
+FinMatrix Copilot— Data Ingestion & Quality Validation Engine
 Enforces schema validation, data provenance tagging, and data quality checks
 for SME financial transaction and invoice records.
 """

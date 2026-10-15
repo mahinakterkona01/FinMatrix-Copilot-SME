@@ -1,5 +1,5 @@
 """
-FinPilot AI — Unit Tests for Financial Analytics Engine
+FinMatrix Copilot — Unit Tests for Financial Analytics Engine
 Tests deterministic calculations for SME health metrics and invoice risk scores.
 """
 

@@ -1,5 +1,5 @@
 """
-FinPilot AI — Evaluation Engine & Level 1 Temporal ML Validation
+FinMatrix Copilot— Evaluation Engine & Level 1 Temporal ML Validation
 Enhanced for Noise Robustness (Rolling Medians, Robust Scaling) & Temporal Leakage Prevention.
 """
 

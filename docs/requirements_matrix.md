@@ -1,7 +1,8 @@
-# FinPilot AI — Competition Problem Statement & Requirements Matrix
+# FinMatrix Copilot — Competition Problem Statement & Requirements Matrix
 
-**Target Competition:** 2026 Shenzhen International FinTech Competition (FinTechathon 2026)
-**Track / Topic:** Topic E — SME Finance Copilot
+**Target Competition:** 2026 Shenzhen International FinTech Competition (FinTechathon 2026)  
+**Track / Topic:** Topic E — SME Finance Copilot  
+**Team:** Team FinMatrixDUO  
 
 ---
 
@@ -17,19 +18,21 @@ Small and Medium Enterprises (SMEs) face critical operational hurdles:
 
 ## 2. Multi-Dataset Architecture & Scope
 
-To address these challenges under strict validation rules, FinPilot AI integrates multiple datasets:
+To address these challenges under strict validation rules, FinMatrix Copilot integrates multiple datasets:
 
-| Dataset Name | Domain / Format | Primary Utility in FinPilot AI |
+| Dataset Name | Domain / Format | Primary Utility in FinMatrix Copilot |
 | :--- | :--- | :--- |
 | **UCI Online Retail II** | Real E-commerce Transactions | Task A: Cash-Flow Time-Series Forecasting |
-| **UK Barnet Council Invoices** | Real Public Invoice Records | Task B: External Late-Payment Model Validation |
-| **Bangladesh SME Synthetic** | Simulated Local BDT Records | Local Currency Testbed & Dashboard Demonstration |
-| **Bangladesh Bank Circulars** | Official Policy PDFs | RAG Engine Grounded Knowledge Base |
+| **UK Barnet Council Invoices** | Real Public Invoice Records | Task B: External Late-Payment Analysis & Working Capital Stress |
+| **Central Bank SME Policy Corpus** | Official Circulars & Guidelines | Task C: RAG Policy Retrieval & Loan Matching |
 
 ---
 
-## 3. Strict 3-Level Validation Safeguards
+## 3. Topic E Requirement Fulfillment Matrix
 
-- **Level 1 (Temporal Validation):** Enforce strict chronological train-test splits on historical lags ($t-1$, $t-7$) to eliminate lookahead bias.
-- **Level 2 (Business Holdout):** Cross-validate model generalization on unseen SME customer groups.
-- **Level 3 (External Benchmark):** Test frozen models on out-of-domain public invoice records.
+| Competition Topic E Core Requirement | FinMatrix Copilot Feature & Architecture | Implementation Status |
+| :--- | :--- | :--- |
+| **Financing-Option Matching** | RAG-powered Policy Search Engine (`src/retrieval.py`) & Working Capital Calculator | ✅ **Matched & Grounded** |
+| **Cash-Flow Management with Alerts** | Ensembled ML Random Forest Forecaster (`src/forecasting.py`) & Safety Threshold Alerts | ✅ **Automated & Proactive** |
+| **Business Financial Analysis** | Solvency Index Gauge, Multi-Sector Environment, and What-If Stress Simulator | ✅ **Enterprise Analytics** |
+| **Security & System Safety** | Structural Injection & SQL Risk Guardrails (`src/safety.py`) | ✅ **Adversarial Safety** |

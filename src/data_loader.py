@@ -1,5 +1,5 @@
 """
-FinPilot AI — Data Ingestion & Validation Engine
+FinMatrix Copilot— Data Ingestion & Validation Engine
 Handles file parsing (CSV/Excel), schema mapping, quality audits,
 missing value handling, and duplicate detection for SME transaction logs.
 """

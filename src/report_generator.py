@@ -1,5 +1,5 @@
 """
-FinPilot AI — Executive PDF & CSV Report Generator
+FinMatrix Copilot— Executive PDF & CSV Report Generator
 Generates enterprise-grade audit summaries, cash-flow metrics,
 and risk evaluations for SME stakeholders and banking institution partners.
 """

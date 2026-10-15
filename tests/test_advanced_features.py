@@ -1,5 +1,5 @@
 """
-FinPilot AI — Test Suite for Data Loader, Audit Logger, and Report Generator
+FinMatrix Copilot — Test Suite for Data Loader, Audit Logger, and Report Generator
 Ensures 100% reliability for advanced enterprise modules under Pytest.
 """
 

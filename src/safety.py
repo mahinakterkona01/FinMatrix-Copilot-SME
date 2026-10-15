@@ -1,5 +1,5 @@
 """
-FinPilot AI — Security Sandbox & Permission Gatekeeper
+FinMatrix Copilot— Security Sandbox & Permission Gatekeeper
 Enforces input sanitization, prompt injection detection, hardcoded permission boundaries,
 and Human-in-the-Loop (HITL) authorization for financial workflows.
 """

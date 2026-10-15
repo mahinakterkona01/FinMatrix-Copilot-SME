@@ -1,5 +1,5 @@
 """
-FinPilot AI — Core Copilot Agent Logic
+FinMatrix Copilot— Core Copilot Agent Logic
 Orchestrates deterministic financial calculations, cash-flow forecasting,
 and citation-grounded policy RAG for SME financial query handling.
 """

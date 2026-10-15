@@ -1,5 +1,5 @@
 """
-FinPilot AI — Automated Security & Adversarial Test Suite
+FinMatrix Copilot — Automated Security & Adversarial Test Suite
 Verifies prompt injection detection, default-deny security policies,
 and Human-in-the-Loop (HITL) authorization gates.
 """

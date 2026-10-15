@@ -1,5 +1,5 @@
 """
-FinPilot AI — Deterministic Financial Engine
+FinMatrix Copilot— Deterministic Financial Engine
 Contains pure, verifiable Python functions for financial calculations,
 cash position tracking, overdue invoice detection, burn rate, and ratio calculations.
 """

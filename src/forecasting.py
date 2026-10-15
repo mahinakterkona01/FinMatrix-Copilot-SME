@@ -1,5 +1,5 @@
 """
-FinPilot AI — Time-Series Cash Flow Forecasting Engine
+FinMatrix Copilot— Time-Series Cash Flow Forecasting Engine
 Trains Random Forest Regressors on historical lag features (t-1, t-7)
 to generate 30-day forward cash-flow predictions under Level 1 Temporal constraints.
 """

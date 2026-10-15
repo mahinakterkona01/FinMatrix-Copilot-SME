@@ -13,8 +13,10 @@
 
 ## 👥 Team FinMatrixDUO
 
-- **Track:** International AI Track | **Topic E:** SME Finance Copilot
-- **Team Members:** [Your Name / GitHub Profile] & [Partner's Name / GitHub Profile]
+- **Track:** International Artificial Intelligence Track | **Topic E:** SME Finance Copilot
+- **Theme:** AI as a Financial Participant
+- **Team Leader / Lead AI Engineer:** Mahin Akter Kona ( https://github.com/mahinakterkona01 )
+- **Team Member / Co-Developer:** Azmain Alam Khan ( https://github.com/Khan-Azmain )
 - **Project Repository:** `FinMatrix-Copilot`
 
 ## 🎯 Topic E Requirement Fulfillment Matrix

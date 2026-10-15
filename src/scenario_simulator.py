@@ -1,5 +1,5 @@
 """
-FinPilot AI — What-If Scenario Simulation Engine
+FinMatrix Copilot— What-If Scenario Simulation Engine
 Allows SMEs to simulate financial impacts of delayed payments, revenue drops,
 or sudden expense increases on projected cash balances.
 """
