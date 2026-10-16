@@ -32,10 +32,61 @@ class CashFlowForecaster:
         Trains model on provided historical dataframe and projects future net cash flows.
         Guarantees zero random number fallback.
         """
-        if df is None or len(df) < 14:
-            raise ValueError("Insufficient historical records. Minimum 14 days required for ML temporal modeling.")
+        
+        # Validate forecast horizon.
+        if isinstance(days, bool) or not isinstance(days, (int, np.integer)) or days <= 0:
+            raise ValueError("days must be a positive integer.")
 
-        data = df.sort_values('trans_date' if 'trans_date' in df.columns else 'date').copy()
+        # Validate historical input.
+        if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+            raise ValueError("Historical data must be a non-empty pandas DataFrame.")
+
+        if len(df) < 14:
+            raise ValueError(
+                "Insufficient historical records. Minimum 14 records required."
+            )
+
+        # Require a supported date column.
+        date_col = next(
+            (col for col in ["trans_date", "date"] if col in df.columns),
+            None,
+        )
+        if date_col is None:
+            raise ValueError(
+                "Missing date column. Expected 'trans_date' or 'date'."
+            )
+
+        if "net_flow" not in df.columns:
+            if {"inflow", "outflow"}.issubset(df.columns):
+                df = df.copy()
+                df["net_flow"] = (
+                    pd.to_numeric(df["inflow"], errors="coerce")
+                    - pd.to_numeric(df["outflow"], errors="coerce")
+                )
+            else:
+                raise ValueError(
+                    "Missing net_flow. Provide net_flow or both inflow and outflow."
+                )
+
+        data = df.copy()
+        data["trans_date"] = pd.to_datetime(data[date_col], errors="coerce")
+
+        if data["trans_date"].isna().any():
+            raise ValueError("Historical data contains invalid or missing dates.")
+
+        data["net_flow"] = pd.to_numeric(data["net_flow"], errors="coerce")
+
+        if not np.isfinite(data["net_flow"].to_numpy(dtype=float)).all():
+            raise ValueError(
+                "net_flow must contain only finite numeric values; missing, "
+                "infinite, or non-numeric values are not allowed."
+            )
+
+        data = (
+            data.sort_values("trans_date")
+            .reset_index(drop=True)
+        )
+ 
         featured_df = self.prepare_lag_features(data)
 
         if len(featured_df) < 7:
@@ -57,7 +108,10 @@ class CashFlowForecaster:
             lag_7 = recent_history[-7]
             rolling_mean = np.mean(recent_history[-7:])
 
-            feat_vector = np.array([[lag_1, lag_7, rolling_mean]])
+            feat_vector = pd.DataFrame(
+    [[lag_1, lag_7, rolling_mean]],
+    columns=['lag_1', 'lag_7', 'rolling_7_mean']
+)
             pred_val = float(self.model.predict(feat_vector)[0])
 
             predictions.append(pred_val)

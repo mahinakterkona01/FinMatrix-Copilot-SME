@@ -1,5 +1,5 @@
-"""
-FinMatrix Copilot — safer Streamlit entry point.
+﻿"""
+FinMatrix Copilot â€” safer Streamlit entry point.
 
 This version deliberately avoids fabricated financial data, random forecasts,
 fake authentication, and unsupported policy claims. It preserves the core
@@ -29,6 +29,8 @@ BASE_DIR = Path(__file__).resolve().parent
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
+from src.normalization import normalize_columns
+
 def optional_import(module_name: str):
     """Import an optional project module without crashing the whole dashboard."""
     try:
@@ -42,8 +44,8 @@ safety_module = optional_import("src.safety")
 copilot_module = optional_import("src.copilot")
 
 st.set_page_config(
-    page_title="FinMatrix Copilot — SME Financial Co-Pilot",
-    page_icon="📊",
+    page_title="FinMatrix Copilot â€” SME Financial Co-Pilot",
+    page_icon="ðŸ“Š",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -404,12 +406,17 @@ def read_user_settings(user_id: int):
                 (user_id,),
             ).fetchone()
         if row:
+            saved_currency = row[0]
             defaults.update({
-                "display_currency": row[0],
-                "business_sector": row[1],
-                "liquidity_buffer": float(row[2]),
-                "appearance": row[3],
-            })
+                    "display_currency": (
+                        saved_currency
+                        if saved_currency in CURRENCY_OPTIONS
+                        else "USD ($)"
+                    ),
+                    "business_sector": row[1],
+                    "liquidity_buffer": float(row[2]),
+                    "appearance": row[3],
+                })
     except (sqlite3.Error, TypeError, ValueError):
         pass
     return defaults
@@ -424,9 +431,12 @@ def save_user_settings(user_id: int, settings: dict):
               business_sector=excluded.business_sector,
               liquidity_buffer=excluded.liquidity_buffer,
               appearance=excluded.appearance
-        """, (
-            settings["display_currency"], settings["business_sector"],
-            float(settings["liquidity_buffer"]), settings["appearance"], user_id
+                """, (
+            user_id,
+            settings["display_currency"],
+            settings["business_sector"],
+            float(settings["liquidity_buffer"]),
+            settings["appearance"],
         ))
 
 def list_chats(user_id: int):
@@ -505,90 +515,19 @@ st.markdown(
 # Helpers and data pipeline
 # ---------------------------------------------------------------------------
 CURRENCY_OPTIONS = {
-    "BDT (৳)": "৳",
     "USD ($)": "$",
-    "EUR (€)": "€",
-    "GBP (£)": "£",
-    "CNY (¥)": "¥",
+    "BDT (\u09f3)": "\u09f3",
+    "EUR (\u20ac)": "\u20ac",
+    "GBP (\u00a3)": "\u00a3",
+    "CNY (\u00a5)": "\u00a5",
 }
-COLUMN_ALIASES = {
-    "trans_date": ["trans_date", "transaction_date", "date", "txn_date", "payment_date"],
-    "inflow": ["inflow", "cash_inflow", "income", "revenue", "credit", "money_in"],
-    "outflow": ["outflow", "cash_outflow", "expense", "expenses", "debit", "money_out"],
-    "net_flow": ["net_flow", "netflow", "net_cash_flow", "net_amount"],
-    "amount": ["amount", "transaction_amount", "value"],
-    "direction": ["direction", "type", "transaction_type", "flow_type"],
+CURRENCY_CODES = {
+    "USD ($)": "USD",
+    "BDT (\u09f3)": "BDT",
+    "EUR (\u20ac)": "EUR",
+    "GBP (\u00a3)": "GBP",
+    "CNY (\u00a5)": "CNY",
 }
-
-def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
-    """Normalize common headers and derive net flow only when justified."""
-    if df is None or df.empty:
-        raise ValueError("The uploaded file has no data rows.")
-    out = df.copy()
-    out.columns = [str(c).strip().lower().replace(" ", "_").replace("-", "_") for c in out.columns]
-    # Rename known aliases to canonical names, without overwriting an existing canonical column.
-    rename = {}
-    for canonical, aliases in COLUMN_ALIASES.items():
-        if canonical in out.columns:
-            continue
-        for alias in aliases:
-            if alias in out.columns:
-                rename[alias] = canonical
-                break
-    out = out.rename(columns=rename)
-
-    if "trans_date" in out.columns:
-        out["trans_date"] = pd.to_datetime(out["trans_date"], errors="coerce")
-
-    for col in ("inflow", "outflow", "net_flow", "amount"):
-        if col in out.columns:
-            original = out[col]
-            # Permit common currency formatting while retaining invalid entries as NaN for validation.
-            cleaned = original.astype(str).str.replace(",", "", regex=False).str.replace("$", "", regex=False)
-            cleaned = cleaned.str.replace("৳", "", regex=False).str.replace("€", "", regex=False)
-            cleaned = cleaned.str.replace("£", "", regex=False).str.replace("¥", "", regex=False).str.strip()
-            out[col] = pd.to_numeric(cleaned, errors="coerce")
-
-    if "inflow" in out.columns and "outflow" in out.columns:
-        invalid_amounts = out[["inflow", "outflow"]].isna().any(axis=1)
-        if invalid_amounts.any():
-            raise ValueError(
-                f"{int(invalid_amounts.sum())} row(s) have missing or invalid inflow/outflow values. "
-                "Correct or remove those rows in your source file, then upload again."
-            )
-        if (out[["inflow", "outflow"]] < 0).any().any():
-            raise ValueError("Inflow and outflow must be non-negative. Use a direction/type column for signed transactions.")
-        out["net_flow"] = out["inflow"] - out["outflow"]
-    elif "net_flow" in out.columns:
-        if out["net_flow"].isna().any():
-            raise ValueError(
-                f"{int(out['net_flow'].isna().sum())} row(s) have invalid net_flow values. "
-                "Please correct them before analysis."
-            )
-        # A signed net-flow-only dataset cannot reliably identify gross inflow/outflow.
-    elif "amount" in out.columns and "direction" in out.columns:
-        if out["amount"].isna().any():
-            raise ValueError("The amount column contains missing or invalid values.")
-        direction = out["direction"].astype(str).str.strip().str.lower()
-        inflow_labels = {"in", "inflow", "income", "revenue", "credit", "deposit", "receipt"}
-        outflow_labels = {"out", "outflow", "expense", "debit", "withdrawal", "payment"}
-        unknown = ~direction.isin(inflow_labels | outflow_labels)
-        if unknown.any():
-            vals = ", ".join(direction[unknown].drop_duplicates().head(5).tolist())
-            raise ValueError(f"Unrecognized transaction direction(s): {vals}. Use inflow/outflow labels.")
-        out["inflow"] = np.where(direction.isin(inflow_labels), out["amount"], 0.0)
-        out["outflow"] = np.where(direction.isin(outflow_labels), out["amount"], 0.0)
-        out["net_flow"] = out["inflow"] - out["outflow"]
-    else:
-        raise ValueError(
-            "Could not identify financial columns. Provide either inflow + outflow, "
-            "a signed net_flow column, or amount + direction/type."
-        )
-
-    if out.empty:
-        raise ValueError("No usable financial records were found.")
-    return out
-
 @st.cache_data(show_spinner=False)
 def read_csv_bytes(file_bytes: bytes) -> pd.DataFrame:
     """Cache uploaded CSV parsing by content, not by mutable UploadedFile state."""
@@ -699,7 +638,7 @@ def get_forecast(df: pd.DataFrame, horizon: int):
         return None, "No supported forecasting class was found in src/forecasting.py."
     try:
         model = cls()
-        result = model.predict_next_days(days=horizon)
+        result = model.predict_next_days(df=df, days=horizon)
         if result is None or not isinstance(result, pd.DataFrame) or result.empty:
             return None, "The forecasting module returned no usable predictions."
         if result.shape[1] < 2:
@@ -727,7 +666,7 @@ if demo_mode:
     current_user = {
         "id": 0,
         "username": "demo",
-        "email": "Not signed in — demo mode",
+        "email": "Not signed in â€” demo mode",
         "full_name": "Demo Workspace",
     }
     st.info("Demo mode: dashboard features are available. Sign-in is shown as an option, but Google OIDC is not enabled yet. Uploaded CSVs and preferences stay in this browser session only.")
@@ -771,7 +710,7 @@ if "chat_messages" not in st.session_state:
 
 st.sidebar.markdown("## FinMatrix Copilot")
 if demo_mode:
-    st.sidebar.caption("Demo workspace · not signed in")
+    st.sidebar.caption("Demo workspace Â· not signed in")
     with st.sidebar.expander("Account", expanded=False):
         st.write("Google sign-in is not configured yet.")
         if st.button("Sign in / Create account", key="sidebar_demo_signin", use_container_width=True):
@@ -846,7 +785,31 @@ input, textarea, [data-baseweb='select'] > div, [data-baseweb='input'] > div,
 }}
 input::placeholder, textarea::placeholder {{ color: {palette['muted']} !important; opacity: 1 !important; }}
 [data-baseweb='select'] *, [data-baseweb='popover'] *, [role='listbox'] *, [role='option'] {{ color: {palette['text']} !important; }}
+[data-baseweb='select'] [data-baseweb='select'] {{
+ background: {palette['input']} !important;
+}}
+[data-baseweb='select'] svg {{
+ color: {palette['text']} !important;
+ fill: currentColor !important;
+}}
+[data-baseweb='select'] [role='presentation'] {{
+ background: transparent !important;
+}}
 [data-baseweb='popover'], [role='listbox'], [role='option'] {{ background: {palette['surface']} !important; }}
+[data-testid='stSidebar'] .react-aria-ComboBox:has(input[aria-label='Appearance']) > [role='group'] {{
+ background: {palette['input']} !important;
+ color: {palette['text']} !important;
+ border-color: {palette['border']} !important;
+}}
+[data-testid='stSidebar'] .react-aria-ComboBox:has(input[aria-label='Appearance']) button {{
+ background: transparent !important;
+ color: {palette['text']} !important;
+ border-color: transparent !important;
+}}
+[data-testid='stSidebar'] .react-aria-ComboBox:has(input[aria-label='Appearance']) svg {{
+ color: {palette['text']} !important;
+}}
+
 .stButton > button, .stDownloadButton > button, [data-testid='stPopover'] button {{
  background: {palette['surface']} !important; color: {palette['text']} !important;
  border: 1px solid {palette['border']} !important; border-radius: 10px !important;
@@ -956,7 +919,7 @@ if selected_theme != st.session_state.get("fm_theme_mode"):
 if st.session_state.get("active_page") in {"AI Financial Copilot", "Regulatory Policy Search"}:
     with st.sidebar.expander("Chat history", expanded=True):
         chat_rows = list_chats(chat_owner_id)
-        if st.button("＋ Start new conversation", key="fm_new_chat", use_container_width=True, type="primary"):
+        if st.button(":material/add: Start new conversation", key="fm_new_chat", use_container_width=True, type="primary"):
             new_id, new_messages = create_chat(chat_owner_id)
             st.session_state["active_chat_id"] = new_id
             st.session_state["chat_messages"] = new_messages
@@ -966,7 +929,7 @@ if st.session_state.get("active_page") in {"AI Financial Copilot", "Regulatory P
             for row in chat_rows:
                 row_col, menu_col = st.columns([5, 1], gap="small")
                 with row_col:
-                    label = ("📌 " if row["is_pinned"] else "") + row["title"]
+                    label = ("ðŸ“Œ " if row["is_pinned"] else "") + row["title"]
                     if st.button(label[:42], key=f"fm_open_chat_{row['chat_id']}", use_container_width=True,
                                  type="primary" if row["chat_id"] == st.session_state.get("active_chat_id") else "secondary"):
                         st.session_state["active_chat_id"] = row["chat_id"]
@@ -974,7 +937,7 @@ if st.session_state.get("active_page") in {"AI Financial Copilot", "Regulatory P
                         st.session_state["active_chat_title"] = row["title"]
                         st.rerun()
                 with menu_col:
-                    with st.popover("⋯", use_container_width=True):
+                    with st.popover("â‹¯", use_container_width=True):
                         st.caption(row["title"])
                         new_name = st.text_input("Chat name", value=row["title"], max_chars=100,
                                                  key=f"fm_rename_input_{row['chat_id']}")
@@ -983,7 +946,7 @@ if st.session_state.get("active_page") in {"AI Financial Copilot", "Regulatory P
                             if row["chat_id"] == st.session_state.get("active_chat_id"):
                                 st.session_state["active_chat_title"] = new_name.strip() or "New chat"
                             st.rerun()
-                        if st.button("📌 Pin chat" if not row["is_pinned"] else "Unpin chat",
+                        if st.button("ðŸ“Œ Pin chat" if not row["is_pinned"] else "Unpin chat",
                                      key=f"fm_pin_{row['chat_id']}", use_container_width=True):
                             set_chat_pinned(chat_owner_id, row["chat_id"], not row["is_pinned"])
                             st.rerun()
@@ -1015,10 +978,24 @@ with st.sidebar.expander("Workspace data & preferences", expanded=False):
     biz_sector = st.selectbox("SME Business Sector", sector_options,
         index=sector_options.index(saved_sector) if saved_sector in sector_options else 0,
         key="sidebar_business_sector")
+    source_currency_choice = st.selectbox(
+        "Source Currency (uploaded CSV)",
+        currency_options,
+        index=currency_options.index("BDT (\u09f3)"),
+        key="sidebar_source_currency",
+        help="Select the currency actually used by your uploaded financial data. This does not convert values.",
+    )
     currency_choice = st.selectbox("Display Currency", currency_options,
         index=currency_options.index(saved_currency) if saved_currency in currency_options else 0,
         key="sidebar_display_currency")
-    currency_symbol = CURRENCY_OPTIONS[currency_choice]
+    if source_currency_choice != currency_choice:
+        st.warning(
+            f"Currency conversion is not available yet. Financial values remain in "
+            f"{source_currency_choice}; selecting {currency_choice} does not convert them."
+        )
+    if source_currency_choice != currency_choice:
+        st.caption("Check the safety buffer amount: saved preferences are not automatically converted between currencies.")
+    currency_symbol = CURRENCY_OPTIONS[source_currency_choice]
     safety_threshold = st.number_input(f"Safety Liquidity Buffer ({currency_symbol})", min_value=0.0,
         value=float(user_settings.get("liquidity_buffer", 5000.0)), step=500.0, key="sidebar_liquidity_buffer")
     uploaded_csv = st.file_uploader("Upload SME cash-flow CSV", type=["csv"])
@@ -1048,12 +1025,12 @@ NAV_GROUPS = {
     "Account": ["User Settings", "About FinMatrix"],
 }
 NAV_ICONS = {
-    "Dashboard": "⌂",
-    "Cash Flow": "↗",
-    "AI Copilot": "✦",
-    "Risk & Reports": "◈",
-    "Data": "▤",
-    "Account": "⚙",
+    "Dashboard": ":material/dashboard:",
+    "Cash Flow": ":material/trending_up:",
+    "AI Copilot": ":material/auto_awesome:",
+    "Risk & Reports": ":material/verified_user:",
+    "Data": ":material/database:",
+    "Account": ":material/settings:",
 }
 ALL_PAGES = [page_name for group_pages in NAV_GROUPS.values() for page_name in group_pages]
 if st.session_state.get("active_page") not in ALL_PAGES:
@@ -1330,7 +1307,7 @@ elif page == "AI Financial Copilot":
                     if intent is not None:
                         answer += f"\n\nIntent: {intent}"
                     if confidence is not None:
-                        answer += f" · Confidence: {confidence}"
+                        answer += f" Â· Confidence: {confidence}"
                 else:
                     answer = str(result)
             except Exception as exc:
@@ -1396,7 +1373,7 @@ elif page == "Regulatory Policy Search":
                                 text = item.get("text") or item.get("content") or str(item)
                                 source = item.get("source") or item.get("filename")
                                 if source:
-                                    st.markdown(f"**Result {idx} · Source: {source}**")
+                                    st.markdown(f"**Result {idx} Â· Source: {source}**")
                                 else:
                                     st.markdown(f"**Result {idx}**")
                                 st.write(text)
@@ -1439,7 +1416,7 @@ elif page == "Security & Guardrail Audit":
 elif page == "Audit Report Exporter":
     if not require_data():
         st.stop()
-    report_text = f"""FINMATRIX COPILOT — FINANCIAL SUMMARY
+    report_text = f"""FINMATRIX COPILOT â€” FINANCIAL SUMMARY
 Generated at: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')}
 Sector selected: {biz_sector}
 Display currency: {currency_choice} (display preference only; no currency conversion performed)
@@ -1525,13 +1502,13 @@ elif page == "About FinMatrix":
     )
     st.markdown("### Competition alignment")
     st.write(
-        "For Shenzhen FinTechathon 2026 — International Track, FinMatrix addresses the theme "
+        "For Shenzhen FinTechathon 2026 â€” International Track, FinMatrix addresses the theme "
         "**AI as a Financial Participant** by aiming to turn SME financial records into practical "
         "analysis and decision support. The system is intended to support human decisions, not "
         "replace accountants, lenders, or regulated financial professionals."
     )
     st.markdown("### Team")
-    st.write("**Team:** inMatrixDUO · **Project:** FinMatrix Copilot")
+    st.write("**Team:** inMatrixDUO Â· **Project:** FinMatrix Copilot")
     st.markdown("### Responsible-use principles")
     st.markdown(
         "- Uses uploaded or explicitly labeled demo data; it does not claim demo records are real customer accounts.\\n"
@@ -1621,4 +1598,4 @@ elif page == "User Settings":
     st.caption("Light/Dark appearance is applied across the app content and saved to your account (or this demo session). Streamlit's outer browser chrome is controlled by Streamlit settings.")
 
 st.divider()
-st.caption("FinMatrix Copilot · Financial calculations use loaded records. Forecasts and policy answers are shown only when configured modules return results.")
+st.caption("FinMatrix Copilot Â· Financial calculations use loaded records. Forecasts and policy answers are shown only when configured modules return results.")

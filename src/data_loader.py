@@ -34,9 +34,10 @@ def clean_and_validate_sme_data(df: pd.DataFrame) -> pd.DataFrame:
         df_cleaned['trans_date'] = pd.to_datetime(df_cleaned[date_col], errors='coerce')
         df_cleaned = df_cleaned.dropna(subset=['trans_date'])
     else:
-        # Fallback date generation if missing
-        df_cleaned['trans_date'] = pd.date_range(start="2025-01-01", periods=len(df_cleaned), freq="D")
-
+        raise ValueError(
+            "No supported date column found. Expected one of: "
+            "trans_date, date, transaction_date, timestamp."
+        )
     # 3. Numeric column hygiene & Imputation
     for num_col in ['inflow', 'outflow', 'net_flow', 'amount']:
         if num_col in df_cleaned.columns:
@@ -44,38 +45,115 @@ def clean_and_validate_sme_data(df: pd.DataFrame) -> pd.DataFrame:
             if num_col in ['inflow', 'outflow']:
                 df_cleaned[num_col] = df_cleaned[num_col].abs()
 
-    # Calculate net_flow if not explicit
-    if 'net_flow' not in df_cleaned.columns:
-        if 'inflow' in df_cleaned.columns and 'outflow' in df_cleaned.columns:
-            df_cleaned['net_flow'] = df_cleaned['inflow'] - df_cleaned['outflow']
-        else:
-            df_cleaned['net_flow'] = pd.to_numeric(df_cleaned.iloc[:, 1], errors='coerce').fillna(0.0)
+   
+    # 3. Calculate financial flows using recognized columns only.
+    if "net_flow" not in df_cleaned.columns:
+        if {"inflow", "outflow"}.issubset(df_cleaned.columns):
+            df_cleaned["net_flow"] = (
+                df_cleaned["inflow"] - df_cleaned["outflow"]
+            )
 
-    # 4. Remove duplicate entries
-    df_cleaned = df_cleaned.drop_duplicates(subset=['trans_date']).sort_values('trans_date').reset_index(drop=True)
+        elif {"amount", "transaction_type"}.issubset(df_cleaned.columns):
+            transaction_types = (
+                df_cleaned["transaction_type"]
+                .astype("string")
+                .str.strip()
+                .str.lower()
+            )
+
+            inflow_mask = transaction_types.isin(
+                ["inflow", "income", "credit", "receipt"]
+            )
+            outflow_mask = transaction_types.isin(
+                ["outflow", "expense", "debit", "payment"]
+            )
+
+            unknown_mask = ~(inflow_mask | outflow_mask)
+
+            if unknown_mask.any():
+                unknown_types = (
+                    transaction_types[unknown_mask]
+                    .dropna()
+                    .unique()
+                    .tolist()
+                )
+                raise ValueError(
+                    "Unknown transaction types; cannot calculate "
+                    f"net_flow safely: {unknown_types}"
+                )
+
+            df_cleaned["inflow"] = df_cleaned["amount"].where(
+                inflow_mask, 0.0
+            )
+            df_cleaned["outflow"] = df_cleaned["amount"].where(
+                outflow_mask, 0.0
+            )
+            df_cleaned["net_flow"] = (
+                df_cleaned["inflow"] - df_cleaned["outflow"]
+            )
+
+
+    # 4. Remove exact duplicate records only.
+    # Multiple legitimate transactions may occur on the same date.
+    df_cleaned = (
+        df_cleaned
+        .drop_duplicates()
+        .sort_values("trans_date")
+        .reset_index(drop=True)
+    )
 
     return df_cleaned
 
-
 def load_sme_data(data_path: str = None) -> pd.DataFrame:
     """
-    Loads primary Bangladesh SME cashflow dataset or generates clean synthetic baseline.
+    Load and validate the configured SME cash-flow dataset.
+
+    Missing or unreadable files raise an explicit error instead of
+    silently substituting unrelated synthetic data.
     """
     if data_path is None:
-        data_path = os.path.join(os.path.dirname(__file__), "..", "data", "raw", "bangladesh_sme_cashflow.csv")
+        data_path = os.path.join(
+            os.path.dirname(__file__),
+            "..",
+            "data",
+            "raw",
+            "bangladesh_sme_cashflow.csv",
+        )
 
-    if os.path.exists(data_path):
-        try:
-            raw_df = pd.read_csv(data_path)
-            return clean_and_validate_sme_data(raw_df)
-        except Exception:
-            pass
+    if not os.path.isfile(data_path):
+        raise FileNotFoundError(
+            f"SME dataset not found: {data_path}. "
+            "Please provide a valid dataset path."
+        )
 
-    # Clean Synthetic Fallback Data Creation
-    np.random.seed(42)
-    dates = pd.date_range(start="2025-01-01", periods=180, freq="D")
-    inflow = np.random.uniform(15000, 60000, size=180)
-    outflow = np.random.uniform(10000, 45000, size=180)
-    synth_df = pd.DataFrame({"trans_date": dates, "inflow": inflow, "outflow": outflow, "net_flow": inflow - outflow})
+    try:
+        raw_df = pd.read_csv(data_path)
+    except (OSError, UnicodeError, pd.errors.ParserError) as exc:
+        raise ValueError(
+            f"Could not read SME dataset '{data_path}': {exc}"
+        ) from exc
+
+    if raw_df.empty:
+        raise ValueError(
+            f"SME dataset is empty: {data_path}"
+        )
+
+    cleaned_df = clean_and_validate_sme_data(raw_df)
+
     
-    return clean_and_validate_sme_data(synth_df)
+    if cleaned_df.empty:
+        raise ValueError(
+            f"No valid records remain after cleaning: {data_path}"
+        )
+
+    # Forecasting requires a valid financial target.
+    if "net_flow" not in cleaned_df.columns:
+        raise ValueError(
+            "The dataset does not contain usable cash-flow data. "
+            "Expected either inflow and outflow columns, or amount "
+            "and transaction_type columns that can produce net_flow."
+        )
+
+    return cleaned_df
+
+
