@@ -91,7 +91,7 @@ Security, authentication, and deployment readiness should be assessed against th
 
 ## Built With
 
-**Python** Ã‚Â· **Streamlit** Ã‚Â· **Pandas** Ã‚Â· **NumPy** Ã‚Â· **Pytest** Ã‚Â· **Modular financial tools** Ã‚Â· **Retrieval-Augmented Generation (RAG)** Ã‚Â· **Configurable LLM integration**
+**Python**· **Streamlit** · **Pandas** · **NumPy** · **Pytest** · **Modular financial tools** · **Retrieval-Augmented Generation (RAG)** · **Configurable LLM integration**
 
 ---
 

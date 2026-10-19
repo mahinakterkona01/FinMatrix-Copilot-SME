@@ -16,7 +16,6 @@ The application is intended to support human decision-making, not replace financ
 ## 2. Known Risks
 
 | Risk | Possible Impact | Mitigation |
-
 |---|---|---|
 | Incorrect or incomplete input data | Calculations and recommendations may be misleading. | Validate inputs, identify missing values, and communicate assumptions. |
 | Forecasting uncertainty | Predicted cash flow may differ from actual business performance. | Present forecasts as estimates and evaluate them against historical or future observations when available. |

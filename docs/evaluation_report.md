@@ -18,7 +18,6 @@ Our goal is to evaluate not only whether the application runs, but also whether 
 The project includes several areas that require separate evaluation.
 
 | Evaluation Area | What We Examine |
-
 |---|---|
 | Financial calculations | Whether supported calculations produce expected results for known inputs. |
 | Data normalization | How the application handles missing fields, inconsistent formats, and invalid values. |

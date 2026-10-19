@@ -171,7 +171,6 @@ Team FinMatrixDUO aims to develop this integration responsibly by evaluating gen
 **Team:** FinMatrixDUO  
 **Project:** FinMatrix Copilot
 
-
 ## Local Ollama setup and safety notes
 
 The supported local configuration uses these `.env` entries:

@@ -50,7 +50,6 @@ flowchart TD
 ## 3. Main Components
 
 | Component | Purpose |
-
 |---|---|
 | `app.py` | Provides the Streamlit interface, navigation, data upload, dashboard, scenario analysis, forecasting interface, policy search, guardrail audit, and report export. |
 | `src/normalization.py` | Prepares and normalizes financial data for supported workflows. |
