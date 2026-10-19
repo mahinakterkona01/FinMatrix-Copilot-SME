@@ -1,0 +1,56 @@
+[
+  {
+    "id": "bb03_jica_project",
+    "query": "JICA assisted Urban Building Safety Project UBSP BD-P84",
+    "expected_source": "jul022026smespdl03e.pdf",
+    "should_abstain": false
+  },
+  {
+    "id": "bb03_npl_threshold",
+    "query": "Non-Performing Loans NPL ratio not exceeding 20 percent",
+    "expected_source": "jul022026smespdl03e.pdf",
+    "should_abstain": false
+  },
+  {
+    "id": "bb04_refinance_fund",
+    "query": "CMSME current working capital refinance fund",
+    "expected_source": "sep202026smespdl04.pdf",
+    "should_abstain": false
+  },
+  {
+    "id": "bb04_finance_companies",
+    "query": "Circular Letter No 04 finance companies eligible for refinancing",
+    "expected_source": "sep202026smespdl04.pdf",
+    "should_abstain": false
+  },
+  {
+    "id": "bb05_udyog_youth",
+    "query": "UDYOG young entrepreneur program age 28",
+    "expected_source": "sep132026smespd05.pdf",
+    "should_abstain": false
+  },
+  {
+    "id": "bb05_lead_bank",
+    "query": "UDYOG district lead bank selection for young entrepreneurs",
+    "expected_source": "sep132026smespd05.pdf",
+    "should_abstain": false
+  },
+  {
+    "id": "bb05_grant",
+    "query": "UDYOG financial assistance grant alongside bank loan",
+    "expected_source": "sep132026smespd05.pdf",
+    "should_abstain": false
+  },
+  {
+    "id": "negative_cake",
+    "query": "chocolate cake baking recipe",
+    "expected_source": null,
+    "should_abstain": true
+  },
+  {
+    "id": "negative_weather",
+    "query": "weather forecast temperature tomorrow",
+    "expected_source": null,
+    "should_abstain": true
+  }
+]

@@ -10,33 +10,36 @@ from typing import Dict, Any, Tuple, List
 
 # Known prompt injection attack signatures
 INJECTION_PATTERNS = [
-    r"ignore\s+(previous|above)\s+instructions",
+    r"ignore\s+(?:all\s+)?(?:previous|above)\s+instructions",
     r"system\s*:\s*override",
     r"transfer\s+all\s+funds",
     r"grant\s+admin",
     r"bypass\s+approval",
     r"reveal\s+secret",
     r"sudo\s+",
-    r"eval\s*\("
+    r"eval\s*\(",
+    r"\bdrop\s+table\b",
+    r"\bartificially\s+inflate\b",
 ]
 
 
 def sanitize_text_input(user_input: str) -> Tuple[str, bool, List[str]]:
     """
-    Scans input text for potential prompt injection patterns and strips dangerous markup.
-    Returns sanitized text, injection detected flag, and list of triggered rules.
+    Strips HTML markup, then scans the resulting text for potential
+    prompt injection patterns.
+    Returns sanitized text, injection detected flag, and triggered rules.
     """
-    triggered_rules = []
     text = str(user_input).strip()
 
+    # Strip HTML-like markup before scanning to detect tag-obfuscated phrases.
+    sanitized_text = re.sub(r"<[^>]*>", "", text)
+
+    triggered_rules = []
     for pattern in INJECTION_PATTERNS:
-        if re.search(pattern, text, re.IGNORECASE):
+        if re.search(pattern, sanitized_text, re.IGNORECASE):
             triggered_rules.append(f"Prompt injection pattern matched: '{pattern}'")
 
-    # Basic HTML/script tag stripping
-    sanitized_text = re.sub(r"<[^>]*>", "", text)
     is_threat = len(triggered_rules) > 0
-
     return sanitized_text, is_threat, triggered_rules
 
 

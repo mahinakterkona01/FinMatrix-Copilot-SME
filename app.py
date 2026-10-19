@@ -1,9 +1,11 @@
-﻿"""
-FinMatrix Copilot â€” safer Streamlit entry point.
+"""
+FinMatrix Copilot — AI-Powered Financial Decision Support for SMEs.
 
-This version deliberately avoids fabricated financial data, random forecasts,
-fake authentication, and unsupported policy claims. It preserves the core
-dashboard workflows while treating optional project modules as optional.
+A Streamlit application that brings financial analysis, cash-flow insights,
+scenario evaluation, and AI-assisted guidance into one workspace.
+
+Built with a focus on transparent calculations, responsible AI usage,
+input validation, and clear communication of assumptions.
 """
 from __future__ import annotations
 
@@ -13,6 +15,7 @@ import sqlite3
 import hashlib
 import hmac
 import json
+import logging
 import uuid
 import secrets
 import time
@@ -39,16 +42,29 @@ def optional_import(module_name: str):
         return None
 
 forecasting_module = optional_import("src.forecasting")
+evaluation_module = optional_import("src.evaluation_engine")
 retrieval_module = optional_import("src.retrieval")
 safety_module = optional_import("src.safety")
 copilot_module = optional_import("src.copilot")
+llm_module = optional_import("src.llm_client")
 
 st.set_page_config(
-    page_title="FinMatrix Copilot â€” SME Financial Co-Pilot",
-    page_icon="ðŸ“Š",
+    page_title="FinMatrix Copilot - SME Financial Co-Pilot",
+    page_icon="F",
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+# Hide Streamlit development chrome (visual-only; not an access-control measure).
+st.markdown("""
+<style>
+[data-testid="stDeployButton"] { display: none !important; }
+[data-testid="stToolbar"] { visibility: hidden !important; height: 0 !important; }
+[data-testid="stMainMenu"], #MainMenu { display: none !important; }
+footer { visibility: hidden !important; }
+</style>
+""", unsafe_allow_html=True)
+
 
 # ---------------------------------------------------------------------------
 # Local authentication and user preferences
@@ -132,6 +148,47 @@ def init_auth_db():
                 FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
             )
         """)
+
+def is_oidc_configured() -> bool:
+    """Reject missing, placeholder, or obviously invalid OIDC configuration."""
+    try:
+        auth = st.secrets.get("auth", {})
+        required = (
+            "redirect_uri", "cookie_secret", "client_id",
+            "client_secret", "server_metadata_url",
+        )
+        values = {key: str(auth.get(key, "")).strip() for key in required}
+
+        if not all(values.values()):
+            return False
+
+        # Example-template values must never activate the login flow.
+        if any("replace_with_" in values[key].lower()
+               for key in ("cookie_secret", "client_id", "client_secret")):
+            return False
+
+        redirect_uri = values["redirect_uri"]
+        redirect_ok = (
+            redirect_uri.endswith("/oauth2callback")
+            and (
+                redirect_uri.startswith("https://")
+                or redirect_uri.startswith("http://localhost:")
+                or redirect_uri.startswith("http://127.0.0.1:")
+            )
+        )
+        if not redirect_ok:
+            return False
+
+        if len(values["cookie_secret"]) < 32:
+            return False
+
+        if not values["server_metadata_url"].startswith("https://"):
+            return False
+
+        return True
+    except Exception:
+        # Missing local secrets must leave the app in explicit demo mode.
+        return False
 
 def get_oidc_claims() -> dict:
     """Return the authenticated OIDC claims from Streamlit's server-managed auth session."""
@@ -354,9 +411,24 @@ def authenticate_user(identifier: str, password: str):
         return None, "Authentication service is temporarily unavailable."
 
 def reset_password_with_recovery(identifier: str, recovery_code: str, new_password: str):
+    """Reset a password using a one-time recovery code with account-level throttling."""
     identifier = (identifier or "").strip()
-    if len(new_password) < 12 or not any(c.isalpha() for c in new_password) or not any(c.isdigit() for c in new_password):
+    generic_failure = "Recovery failed. Check the account details and recovery code."
+
+    if not identifier:
+        return False, generic_failure
+    if (
+        len(new_password) < 12
+        or not any(c.isalpha() for c in new_password)
+        or not any(c.isdigit() for c in new_password)
+    ):
         return False, "New password must be at least 12 characters and include a letter and a number."
+
+    limited, seconds = login_is_limited(identifier)
+    if limited:
+        minutes = max(1, seconds // 60 + 1)
+        return False, f"Too many recovery attempts. Try again in about {minutes} minute(s)."
+
     try:
         with get_auth_connection() as conn:
             row = conn.execute(
@@ -364,22 +436,36 @@ def reset_password_with_recovery(identifier: str, recovery_code: str, new_passwo
                    WHERE username=? COLLATE NOCASE OR email=? COLLATE NOCASE""",
                 (identifier, identifier),
             ).fetchone()
-            if not row or not row[1] or not row[2]:
-                return False, "Recovery failed. Check the account details and recovery code."
-            submitted_hash = password_digest(recovery_code.strip(), row[2])
-            if not hmac.compare_digest(submitted_hash, row[1]):
-                return False, "Recovery failed. Check the account details and recovery code."
-            new_salt = secrets.token_hex(16)
-            new_hash = password_digest(new_password, new_salt)
-            # Rotate the recovery code after use; the account owner must sign in and generate a new one.
-            conn.execute(
-                "UPDATE users SET password_hash=?,password_salt=?,recovery_hash=NULL,recovery_salt=NULL WHERE id=?",
-                (new_hash, new_salt, row[0]),
-            )
-            conn.execute("DELETE FROM auth_rate_limits WHERE identity_key=?", (_identity_key(identifier),))
+
+            valid_code = False
+            if row and row[1] and row[2]:
+                submitted_hash = password_digest((recovery_code or "").strip(), row[2])
+                valid_code = hmac.compare_digest(submitted_hash, row[1])
+
+            if valid_code:
+                new_salt = secrets.token_hex(16)
+                new_hash = password_digest(new_password, new_salt)
+                conn.execute(
+                    """UPDATE users
+                       SET password_hash=?,password_salt=?,
+                           recovery_hash=NULL,recovery_salt=NULL
+                       WHERE id=?""",
+                    (new_hash, new_salt, row[0]),
+                )
+                conn.execute(
+                    "DELETE FROM auth_rate_limits WHERE identity_key=?",
+                    (_identity_key(identifier),),
+                )
+
+        if not valid_code:
+            # Count unknown accounts and wrong recovery codes identically.
+            record_login_failure(identifier)
+            return False, generic_failure
+
         return True, "Password reset successful. Sign in with your new password. Your recovery code was consumed."
     except sqlite3.Error:
         return False, "Password reset could not be completed because of a local database error."
+
 
 def rotate_recovery_code(user_id: int):
     code = _new_recovery_code()
@@ -514,6 +600,10 @@ st.markdown(
 # ---------------------------------------------------------------------------
 # Helpers and data pipeline
 # ---------------------------------------------------------------------------
+MAX_CSV_BYTES = 10 * 1024 * 1024
+MAX_CSV_ROWS = 100_000
+MAX_CSV_COLUMNS = 100
+
 CURRENCY_OPTIONS = {
     "USD ($)": "$",
     "BDT (\u09f3)": "\u09f3",
@@ -530,9 +620,30 @@ CURRENCY_CODES = {
 }
 @st.cache_data(show_spinner=False)
 def read_csv_bytes(file_bytes: bytes) -> pd.DataFrame:
-    """Cache uploaded CSV parsing by content, not by mutable UploadedFile state."""
+    """Parse a bounded CSV upload; limits protect memory and processing time."""
     from io import BytesIO
-    return pd.read_csv(BytesIO(file_bytes))
+
+    if not isinstance(file_bytes, (bytes, bytearray)) or not file_bytes:
+        raise ValueError("The uploaded CSV is empty.")
+
+    if len(file_bytes) > MAX_CSV_BYTES:
+        raise ValueError("CSV exceeds the 10 MB upload limit.")
+
+    try:
+        # Read one extra row so oversized datasets are rejected, not silently truncated.
+        frame = pd.read_csv(BytesIO(file_bytes), nrows=MAX_CSV_ROWS + 1)
+    except pd.errors.EmptyDataError as exc:
+        raise ValueError("The uploaded CSV is empty or has no header.") from exc
+
+    if frame.empty:
+        raise ValueError("The uploaded CSV has no data rows.")
+    if len(frame) > MAX_CSV_ROWS:
+        raise ValueError("CSV exceeds the 100,000-row limit.")
+    if len(frame.columns) > MAX_CSV_COLUMNS:
+        raise ValueError("CSV exceeds the 100-column limit.")
+
+    return frame
+
 
 def load_available_data(uploaded_file, user_id: int) -> tuple[Optional[pd.DataFrame], str]:
     """Load the signed-in user's private CSV, or keep demo uploads in this browser session only."""
@@ -548,8 +659,11 @@ def load_available_data(uploaded_file, user_id: int) -> tuple[Optional[pd.DataFr
             else:
                 save_user_dataset(user_id, uploaded_file.name, csv_bytes)
             return normalized, f"{'Temporary demo upload' if demo_mode else 'Your uploaded dataset'}: {Path(uploaded_file.name).name}"
-        except Exception as exc:
+        except ValueError as exc:
             return None, f"Upload could not be used: {exc}"
+        except Exception:
+            logging.exception("Uploaded CSV processing failed")
+            return None, "Upload could not be used. Check that it is a valid CSV with the required financial columns."
 
     try:
         if demo_mode:
@@ -560,8 +674,11 @@ def load_available_data(uploaded_file, user_id: int) -> tuple[Optional[pd.DataFr
             filename, csv_bytes = saved
             raw = read_csv_bytes(csv_bytes)
             return normalize_columns(raw), f"{'Temporary demo dataset' if demo_mode else 'Your saved dataset'}: {filename}"
-    except Exception as exc:
+    except ValueError as exc:
         return None, f"Dataset could not be loaded: {exc}"
+    except Exception:
+        logging.exception("Saved dataset loading failed")
+        return None, "Dataset could not be loaded. Upload a valid CSV and try again."
 
     # The bundled dataset is shared read-only demo data, never stored as a user's private upload.
     candidate_paths = [
@@ -660,7 +777,484 @@ def get_forecast(df: pd.DataFrame, horizon: int):
 # browser session and are not represented as a verified or authenticated account.
 SESSION_IDLE_SECONDS = 30 * 60
 claims = get_oidc_claims()
-demo_mode = not bool(claims)
+local_user = st.session_state.get("fm_local_user")
+demo_access = bool(st.session_state.get("fm_demo_access"))
+
+# An explicit demo choice is separate from authentication.
+# Never convert unverified OIDC claims into an authenticated user.
+if demo_access and not local_user:
+    claims = {}
+
+# Dedicated, responsive authentication experience.
+if not claims and not local_user and not demo_access:
+    st.markdown("""
+    <style>
+    .block-container:has(.fm-auth-marker) {
+        max-width: 980px !important;
+        padding-top: .75rem !important;
+    }
+    .fm-auth-marker { height: 0; overflow: hidden; }
+
+    /* FinMatrix authentication: clear brand hierarchy and consistent controls */
+    .fm-auth-brand {
+        font-size: 2.2rem !important;
+        line-height: 1.12 !important;
+        font-weight: 800 !important;
+        letter-spacing: -.045em !important;
+        margin-bottom: .25rem !important;
+        color: #172B45 !important;
+    }
+    .fm-auth-subtitle {
+        font-size: .9rem !important;
+        line-height: 1.45 !important;
+        color: #40536B !important;
+        margin-top: .12rem !important;
+    }
+    .block-container:has(.fm-auth-marker) {
+        padding-bottom: .65rem !important;
+    }
+    .block-container:has(.fm-auth-marker) h3 {
+        font-size: 1.15rem !important;
+        line-height: 1.3 !important;
+        font-weight: 650 !important;
+        margin-top: .45rem !important;
+        margin-bottom: .65rem !important;
+    }
+    .fm-auth-marker { height: 0; overflow: hidden; }
+    .fm-auth-competition-footer {
+        margin-top: .65rem;
+        padding-top: .55rem;
+        border-top: 1px solid #E2E8F0;
+        color: #8491A3;
+        font-size: .72rem;
+        line-height: 1.4;
+    }
+    .fm-auth-feature {
+        padding: .24rem 0 !important;
+        color: #64748B !important;
+        font-size: .88rem !important;
+        line-height: 1.5 !important;
+    }
+    .fm-auth-feature b { color: #172B45 !important; }
+    .fm-auth-divider {
+        display: flex;
+        align-items: center;
+        gap: .7rem;
+        color: #8491A3;
+        font-size: .72rem;
+        margin: .65rem 0;
+    }
+    .fm-auth-divider::before, .fm-auth-divider::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: #E2E8F0;
+    }
+    .fm-auth-divider span { padding: 0 .15rem; }
+    .fm-auth-trust { display: none !important; }
+
+    div[data-testid="stTextInput"] input,
+    div[data-testid="stTextInput"] input:focus,
+    div[data-testid="stTextInput"] input:hover {
+        box-sizing: border-box !important;
+        border: 1px solid #AAB7C8 !important;
+        border-radius: 7px !important;
+        box-shadow: none !important;
+    }
+    div[data-testid="stTextInput"] button {
+        border: 1px solid #AAB7C8 !important;
+        border-left: 0 !important;
+        border-radius: 0 7px 7px 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+    }
+    div[data-testid="stTextInput"] input[type="password"] {
+        border-radius: 7px 0 0 7px !important;
+    }
+    div[data-testid="stForm"] {
+        padding: 16px !important;
+        border-radius: 12px !important;
+    }
+    div[data-testid="stForm"] [data-testid="stVerticalBlock"] {
+        gap: .45rem !important;
+    }
+    div[data-testid="stForm"] label { margin-bottom: .2rem !important; }
+    [data-testid="stTextInput"] input,
+    [data-testid="stTextArea"] textarea {
+        border: 1.5px solid #9AAAC0 !important;
+        border-radius: 8px !important;
+        background: #FFFFFF !important;
+        color: #17263D !important;
+        min-height: 2.7rem;
+    }
+    [data-testid="stTextInput"] input:focus,
+    [data-testid="stTextArea"] textarea:focus {
+        border-color: #245EDB !important;
+        box-shadow: 0 0 0 2px rgba(36,94,219,.2) !important;
+        outline: none !important;
+    }
+    .stButton > button, [data-testid="stFormSubmitButton"] button {
+        border-radius: 9px !important;
+        min-height: 2.65rem;
+        font-weight: 650 !important;
+        transition: border-color .15s ease, box-shadow .15s ease,
+                    transform .15s ease;
+    }
+    .stButton > button:hover, [data-testid="stFormSubmitButton"] button:hover {
+        border-color: #245EDB !important;
+        box-shadow: 0 3px 10px rgba(36,94,219,.13);
+        transform: translateY(-1px);
+    }
+    .stButton > button:focus-visible,
+    [data-testid="stFormSubmitButton"] button:focus-visible {
+        outline: 2px solid #245EDB !important;
+        outline-offset: 2px;
+    }
+    @media (max-width: 760px) {
+        .block-container:has(.fm-auth-marker) {
+            max-width: 100% !important;
+            padding: 1rem .85rem 1.5rem !important;
+        }
+        .fm-auth-brand { font-size: 1.9rem !important; }
+        .fm-auth-competition-footer { margin-top: .4rem; }
+        div[data-testid="stForm"] { padding: 12px !important; }
+        [data-testid="stHorizontalBlock"] { gap: .8rem !important; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .stButton > button,
+        [data-testid="stFormSubmitButton"] button { transition: none; }
+    }
+    [data-testid="stDeployButton"] { display: none !important; }
+    [data-testid="stToolbar"] { visibility: hidden !important; height: 0 !important; }
+    [data-testid="stMainMenu"], #MainMenu { display: none !important; }
+    footer { visibility: hidden !important; }
+    .fm-auth-brand { font-size: 1.8rem; font-weight: 800; letter-spacing: -.04em; }
+    .fm-auth-subtitle { color: #52647D; font-size: .96rem; }
+    .fm-auth-feature { padding: .28rem 0; color: #26364B; }
+    .fm-auth-trust {
+        color: #52647D; font-size: .82rem; text-align: center;
+        margin-top: .9rem;
+    }
+    [data-testid="stTextInput"] input,
+    [data-testid="stTextArea"] textarea {
+        border: 1.5px solid #9AAAC0 !important;
+        border-radius: 8px !important;
+        background: #FFFFFF !important;
+        color: #17263D !important;
+        min-height: 2.7rem;
+    }
+    [data-testid="stTextInput"] input:focus,
+    [data-testid="stTextArea"] textarea:focus {
+        border-color: #245EDB !important;
+        box-shadow: 0 0 0 2px rgba(36,94,219,.2) !important;
+        outline: none !important;
+    }
+    .stButton > button, [data-testid="stFormSubmitButton"] button {
+        border-radius: 9px !important;
+        min-height: 2.65rem;
+        font-weight: 650 !important;
+        transition: border-color .15s ease, box-shadow .15s ease,
+                    transform .15s ease;
+    }
+    .stButton > button:hover, [data-testid="stFormSubmitButton"] button:hover {
+        border-color: #245EDB !important;
+        box-shadow: 0 3px 10px rgba(36,94,219,.13);
+        transform: translateY(-1px);
+    }
+    .stButton > button:focus-visible,
+    [data-testid="stFormSubmitButton"] button:focus-visible {
+        outline: 2px solid #245EDB !important;
+        outline-offset: 2px;
+    }
+    @media (max-width: 760px) {
+        .block-container:has(.fm-auth-marker) {
+            padding: 1rem .85rem 2rem !important;
+        }
+        .fm-auth-brand { font-size: 1.55rem; }
+        [data-testid="stHorizontalBlock"] { gap: .8rem !important; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .stButton > button,
+        [data-testid="stFormSubmitButton"] button { transition: none; }
+    }
+    /* Login greeting: slightly smaller and gently lowered */
+    .fm-auth-welcome {
+        font-size: 1.55rem !important;
+        line-height: 1.2 !important;
+        margin-top: .3rem !important;
+    }
+    </style>
+    <div class="fm-auth-marker"></div>
+    """, unsafe_allow_html=True)
+
+    value_col, form_col = st.columns([1, 1.0], gap="small")
+
+    with value_col:
+        st.markdown(
+            '<div class="fm-auth-brand">FinMatrix</div>'
+            '<p class="fm-auth-subtitle">Your intelligent financial co-pilot for SMEs</p>',
+            unsafe_allow_html=True,
+        )
+        st.write("")
+        st.markdown("### Understand your business finances.")
+        st.markdown(
+            '<div class="fm-auth-feature">01 | <b>Cash-flow visibility</b><br>'
+            'Review inflows, outflows and financial trends.</div>'
+            '<div class="fm-auth-feature">02 | <b>Evidence-aware insights</b><br>'
+            'Explore retrieved information with clear limitations.</div>'
+            '<div class="fm-auth-feature">03 | <b>Responsible by design</b><br>'
+            'Keep identity checks and financial caveats explicit.</div>',
+            unsafe_allow_html=True,
+        )
+        st.caption(
+            "Built for clearer decisions - not a substitute for professional "
+            "accounting, financial advice or independent verification."
+        )
+        st.markdown(
+            '<div class="fm-auth-competition-footer">'
+            '2026 FinTechathon | Team FinMatrix DUO</div>',
+            unsafe_allow_html=True,
+        )
+        st.write("")
+        st.caption("Want to explore first? Use a temporary demo workspace.")
+        if st.button(
+            "Continue in demo mode", key="fm_enter_demo",
+            width="stretch",
+        ):
+            st.session_state.pop("fm_local_user", None)
+            st.session_state["fm_demo_access"] = True
+            st.rerun()
+
+    with form_col:
+        with st.container():
+            st.markdown(
+                '<div class="fm-auth-brand fm-auth-welcome">Welcome back</div>'
+                '<p class="fm-auth-subtitle">Sign in to continue to your workspace.</p>',
+                unsafe_allow_html=True,
+            )
+
+            auth_view = st.session_state.get("fm_auth_view", "signin")
+
+            if auth_view == "signin":
+                with st.form("fm_local_signin_form"):
+                    login_identifier = st.text_input(
+                        "Email or username",
+                        placeholder="you@company.com",
+                        key="fm_login_identifier",
+                    )
+                    login_password = st.text_input(
+                        "Password",
+                        type="password",
+                        placeholder="Enter your password",
+                        key="fm_login_password",
+                    )
+                    remember_me = st.checkbox(
+                        "Keep me signed in",
+                        key="fm_remember_me",
+                    )
+                    submitted_login = st.form_submit_button(
+                        "Sign in", type="primary", width="stretch"
+                    )
+
+                if submitted_login:
+                    if not login_identifier.strip() or not login_password:
+                        st.error("Enter your email/username and password.")
+                    else:
+                        with st.spinner("Signing in..."):
+                            signed_user, sign_error = authenticate_user(
+                                login_identifier, login_password
+                            )
+                        if signed_user:
+                            st.session_state["fm_local_user"] = signed_user
+                            st.session_state.pop("fm_demo_access", None)
+                            st.session_state.pop("fm_auth_view", None)
+                            if remember_me:
+                                st.session_state["fm_remember_identifier"] = (
+                                    login_identifier.strip()
+                                )
+                            else:
+                                st.session_state.pop("fm_remember_identifier", None)
+                            st.session_state["fm_login_notice"] = (
+                                "Signed in successfully."
+                            )
+                            st.rerun()
+                        elif sign_error and (
+                            "Too many failed attempts" in sign_error
+                            or "temporarily unavailable" in sign_error
+                        ):
+                            st.error(sign_error)
+                        else:
+                            st.error("Email/username or password is incorrect.")
+
+                if is_oidc_configured():
+                    st.markdown(
+                        '<div class="fm-auth-divider"><span>OR</span></div>',
+                        unsafe_allow_html=True,
+                    )
+                if is_oidc_configured():
+                    if st.button(
+                        "Continue with Google",
+                        key="fm_google_signin_screen",
+                        width="stretch",
+                    ):
+                        st.session_state.pop("fm_demo_access", None)
+                        with st.spinner("Redirecting to Google..."):
+                            st.login()
+
+                left_link, right_link = st.columns(2)
+                with left_link:
+                    if st.button(
+                        "Create account", key="fm_show_create",
+                        width="stretch",
+                    ):
+                        st.session_state["fm_auth_view"] = "create"
+                        st.rerun()
+                with right_link:
+                    if st.button(
+                        "Forgot password?", key="fm_show_recovery",
+                        width="stretch",
+                    ):
+                        st.session_state["fm_auth_view"] = "recovery"
+                        st.rerun()
+
+            elif auth_view == "create":
+                st.caption("Create a private local account.")
+                new_full_name = st.text_input(
+                    "Full name", key="fm_register_name"
+                )
+                new_username = st.text_input(
+                    "Username", key="fm_register_username"
+                )
+                new_email = st.text_input(
+                    "Email address", placeholder="you@company.com",
+                    key="fm_register_email"
+                )
+                new_password = st.text_input(
+                    "Create password", type="password",
+                    key="fm_register_password"
+                )
+                confirm_password = st.text_input(
+                    "Confirm password", type="password",
+                    key="fm_register_confirm"
+                )
+
+                strength = 0
+                if len(new_password) >= 12:
+                    strength += 1
+                if any(ch.isalpha() for ch in new_password) and any(
+                    ch.isdigit() for ch in new_password
+                ):
+                    strength += 1
+                if len(new_password) >= 16 and any(
+                    not ch.isalnum() for ch in new_password
+                ):
+                    strength += 1
+                strength_label = (
+                    "Enter a password" if not new_password else
+                    "Weak" if strength == 0 else
+                    "Fair" if strength == 1 else
+                    "Good" if strength == 2 else "Strong"
+                )
+                st.caption(f"Password strength: {strength_label}")
+                st.progress(strength / 3)
+
+                if st.button(
+                    "Create account", key="fm_create_account_submit",
+                    type="primary", width="stretch",
+                ):
+                    if new_password != confirm_password:
+                        st.error("The passwords do not match.")
+                    elif len(new_password) < 12:
+                        st.error("Use at least 12 characters for your password.")
+                    elif not any(ch.isalpha() for ch in new_password) or not any(
+                        ch.isdigit() for ch in new_password
+                    ):
+                        st.error("Include at least one letter and one number.")
+                    else:
+                        with st.spinner("Creating your account..."):
+                            created, create_message, recovery_code = create_account(
+                                new_username, new_email, new_full_name, new_password
+                            )
+                        if created:
+                            st.success(create_message)
+                            st.warning(
+                                "Save this recovery code privately. It is shown "
+                                "only once and can be used to reset your password."
+                            )
+                            st.code(recovery_code)
+                            st.info("Your account is ready. Return to sign in.")
+                        else:
+                            st.error(create_message)
+
+                if st.button("Back to sign in", key="fm_create_back"):
+                    st.session_state["fm_auth_view"] = "signin"
+                    st.rerun()
+
+                if is_oidc_configured():
+                    st.markdown(
+                        '<div class="fm-auth-divider"><span>OR</span></div>',
+                        unsafe_allow_html=True,
+                    )
+                    if st.button(
+                        "Continue with Google",
+                        key="fm_google_create_screen",
+                        width="stretch",
+                    ):
+                        st.session_state.pop("fm_demo_access", None)
+                        st.login()
+
+            elif auth_view == "recovery":
+                st.caption(
+                    "Reset your password using the one-time recovery code "
+                    "issued when the account was created."
+                )
+                with st.form("fm_password_recovery_form"):
+                    recovery_identifier = st.text_input(
+                        "Email or username", placeholder="you@company.com",
+                        key="fm_recovery_identifier"
+                    )
+                    recovery_code_input = st.text_input(
+                        "Recovery code", type="password",
+                        key="fm_recovery_code"
+                    )
+                    recovered_password = st.text_input(
+                        "New password", type="password",
+                        key="fm_recovery_new_password"
+                    )
+                    recovery_confirm = st.text_input(
+                        "Confirm new password", type="password",
+                        key="fm_recovery_confirm"
+                    )
+                    submitted_recovery = st.form_submit_button(
+                        "Reset password", width="stretch"
+                    )
+                if submitted_recovery:
+                    if recovered_password != recovery_confirm:
+                        st.error("The new passwords do not match.")
+                    else:
+                        with st.spinner("Verifying recovery code..."):
+                            reset_ok, reset_message = reset_password_with_recovery(
+                                recovery_identifier, recovery_code_input,
+                                recovered_password
+                            )
+                        if reset_ok:
+                            st.success(reset_message)
+                            st.session_state["fm_auth_view"] = "signin"
+                        else:
+                            st.error(reset_message)
+
+                if st.button("Back to sign in", key="fm_recovery_back"):
+                    st.session_state["fm_auth_view"] = "signin"
+                    st.rerun()
+
+            else:
+                st.session_state["fm_auth_view"] = "signin"
+                st.rerun()
+
+
+    st.stop()
+
+demo_mode = not bool(claims) and not bool(local_user) and bool(demo_access)
 
 if demo_mode:
     current_user = {
@@ -669,9 +1263,15 @@ if demo_mode:
         "email": "Not signed in â€” demo mode",
         "full_name": "Demo Workspace",
     }
-    st.info("Demo mode: dashboard features are available. Sign-in is shown as an option, but Google OIDC is not enabled yet. Uploaded CSVs and preferences stay in this browser session only.")
-    if st.button("Sign in / Create account", key="demo_signin_option", type="secondary"):
-        st.warning("Sign-in is not enabled in this build yet. Configure and test Google OIDC before using real customer financial data.")
+    if is_oidc_configured():
+        st.info("Demo mode is temporary. Sign in with Google to open your account workspace.")
+        if st.button("Sign in with Google", key="demo_signin_option", type="secondary"):
+            st.session_state.pop("fm_demo_access", None)
+            st.login()
+    else:
+        st.info("Demo mode uses a temporary workspace. Use synthetic data only; uploads stay in this browser session.")
+elif local_user and not claims:
+    current_user = local_user
 else:
     current_user, identity_error = oidc_identity_to_local_user(claims)
     if not current_user:
@@ -680,17 +1280,24 @@ else:
             st.logout()
         st.stop()
 
-    # Streamlit's OIDC cookie/session is the authentication authority. This app-level
-    # idle timeout adds a shorter financial-workspace timeout.
+# Apply idle timeout to authenticated local-password and OIDC users.
+# Demo mode is intentionally excluded.
+if not demo_mode:
     session_key = f"fm_last_seen_{current_user['id']}"
     last_seen = float(st.session_state.get(session_key, 0))
     if last_seen and time.time() - last_seen > SESSION_IDLE_SECONDS:
-        st.session_state.pop(session_key, None)
-        for key in ["chat_messages", "finmatrix_forecast", "finmatrix_forecast_error"]:
-            st.session_state.pop(key, None)
-        st.warning("Your financial workspace timed out. Sign out and sign in again to establish a fresh session.")
-        if st.button("Sign out now"):
+        for key in list(st.session_state.keys()):
+            if key.startswith("fm_last_seen_") or key in {
+                "authenticated_user", "user_settings", "chat_messages",
+                "finmatrix_forecast", "finmatrix_forecast_error",
+                "active_chat_id", "active_chat_title", "fm_local_user",
+                "new_recovery_code_once"
+            }:
+                st.session_state.pop(key, None)
+        if claims:
             st.logout()
+        else:
+            st.rerun()
         st.stop()
     st.session_state[session_key] = time.time()
 
@@ -709,24 +1316,33 @@ if "chat_messages" not in st.session_state:
     ]
 
 st.sidebar.markdown("## FinMatrix Copilot")
+st.sidebar.caption("SME financial workspace")
 if demo_mode:
-    st.sidebar.caption("Demo workspace Â· not signed in")
+    st.sidebar.caption("Demo workspace  |  temporary session")
     with st.sidebar.expander("Account", expanded=False):
-        st.write("Google sign-in is not configured yet.")
-        if st.button("Sign in / Create account", key="sidebar_demo_signin", use_container_width=True):
-            st.info("Configure Google OIDC to enable real sign-in. The dashboard remains available in demo mode.")
+        st.write("You are using a temporary demo workspace.")
+        if is_oidc_configured():
+            if st.button("Sign in with Google", key="sidebar_demo_signin", width="stretch"):
+                st.session_state.pop("fm_demo_access", None)
+                st.login()
 else:
     st.sidebar.caption(f"Signed in as {current_user['full_name']}")
     with st.sidebar.expander("Account", expanded=True):
         st.write(current_user["email"])
-        if st.button("Sign out", key="finmatrix_signout", use_container_width=True):
+        st.caption("Password account" if local_user and not claims else "Google account")
+        if st.button("Log out", key="finmatrix_signout", width="stretch"):
             for key in list(st.session_state.keys()):
                 if key.startswith("fm_last_seen_") or key in {
                     "authenticated_user", "user_settings", "chat_messages",
-                    "finmatrix_forecast", "finmatrix_forecast_error"
+                    "finmatrix_forecast", "finmatrix_forecast_error",
+                    "active_chat_id", "active_chat_title", "fm_local_user",
+                    "fm_demo_access", "demo_uploaded_dataset", "demo_user_settings"
                 }:
                     st.session_state.pop(key, None)
-            st.logout()
+            if claims:
+                st.logout()
+            else:
+                st.rerun()
 
 st.session_state["authenticated_user"] = current_user
 if demo_mode:
@@ -919,7 +1535,7 @@ if selected_theme != st.session_state.get("fm_theme_mode"):
 if st.session_state.get("active_page") in {"AI Financial Copilot", "Regulatory Policy Search"}:
     with st.sidebar.expander("Chat history", expanded=True):
         chat_rows = list_chats(chat_owner_id)
-        if st.button(":material/add: Start new conversation", key="fm_new_chat", use_container_width=True, type="primary"):
+        if st.button(":material/add: Start new conversation", key="fm_new_chat", width="stretch", type="primary"):
             new_id, new_messages = create_chat(chat_owner_id)
             st.session_state["active_chat_id"] = new_id
             st.session_state["chat_messages"] = new_messages
@@ -929,32 +1545,32 @@ if st.session_state.get("active_page") in {"AI Financial Copilot", "Regulatory P
             for row in chat_rows:
                 row_col, menu_col = st.columns([5, 1], gap="small")
                 with row_col:
-                    label = ("ðŸ“Œ " if row["is_pinned"] else "") + row["title"]
-                    if st.button(label[:42], key=f"fm_open_chat_{row['chat_id']}", use_container_width=True,
+                    label = ("[Pinned] " if row["is_pinned"] else "") + row["title"]
+                    if st.button(label[:42], key=f"fm_open_chat_{row['chat_id']}", width="stretch",
                                  type="primary" if row["chat_id"] == st.session_state.get("active_chat_id") else "secondary"):
                         st.session_state["active_chat_id"] = row["chat_id"]
                         st.session_state["chat_messages"] = row["messages"] or []
                         st.session_state["active_chat_title"] = row["title"]
                         st.rerun()
                 with menu_col:
-                    with st.popover("â‹¯", use_container_width=True):
+                    with st.popover("â‹¯", width="stretch"):
                         st.caption(row["title"])
                         new_name = st.text_input("Chat name", value=row["title"], max_chars=100,
                                                  key=f"fm_rename_input_{row['chat_id']}")
-                        if st.button("Save name", key=f"fm_rename_{row['chat_id']}", use_container_width=True):
+                        if st.button("Save name", key=f"fm_rename_{row['chat_id']}", width="stretch"):
                             rename_chat(chat_owner_id, row["chat_id"], new_name)
                             if row["chat_id"] == st.session_state.get("active_chat_id"):
                                 st.session_state["active_chat_title"] = new_name.strip() or "New chat"
                             st.rerun()
-                        if st.button("ðŸ“Œ Pin chat" if not row["is_pinned"] else "Unpin chat",
-                                     key=f"fm_pin_{row['chat_id']}", use_container_width=True):
+                        if st.button("Pin chat" if not row["is_pinned"] else "Unpin chat",
+                                     key=f"fm_pin_{row['chat_id']}", width="stretch"):
                             set_chat_pinned(chat_owner_id, row["chat_id"], not row["is_pinned"])
                             st.rerun()
                         export_text = "\n\n".join(("You" if m.get("role") == "user" else "FinMatrix Copilot") + ":\n" + str(m.get("content", "")) for m in row["messages"])
                         st.download_button("Export / share text", data=export_text or "Empty conversation",
                                            file_name=f"finmatrix-chat-{row['chat_id'][:8]}.txt", mime="text/plain",
-                                           key=f"fm_export_{row['chat_id']}", use_container_width=True)
-                        if st.button("Delete chat", key=f"fm_delete_{row['chat_id']}", use_container_width=True):
+                                           key=f"fm_export_{row['chat_id']}", width="stretch")
+                        if st.button("Delete chat", key=f"fm_delete_{row['chat_id']}", width="stretch"):
                             delete_chat(chat_owner_id, row["chat_id"])
                             remaining = list_chats(chat_owner_id)
                             if row["chat_id"] == st.session_state.get("active_chat_id"):
@@ -981,7 +1597,7 @@ with st.sidebar.expander("Workspace data & preferences", expanded=False):
     source_currency_choice = st.selectbox(
         "Source Currency (uploaded CSV)",
         currency_options,
-        index=currency_options.index("BDT (\u09f3)"),
+        index=currency_options.index("USD ($)"),
         key="sidebar_source_currency",
         help="Select the currency actually used by your uploaded financial data. This does not convert values.",
     )
@@ -1005,7 +1621,7 @@ with st.sidebar.expander("Workspace data & preferences", expanded=False):
 # their own account id for isolated saved datasets.
 df, data_status = load_available_data(uploaded_csv, 0 if demo_mode else current_user["id"])
 
-if st.sidebar.button("Delete my saved CSV", use_container_width=True):
+if st.sidebar.button("Delete my saved CSV", width="stretch"):
     if demo_mode:
         st.session_state.pop("demo_uploaded_dataset", None)
     else:
@@ -1047,7 +1663,7 @@ for col, (group_name, group_pages) in zip(nav_cols, NAV_GROUPS.items()):
             f"{NAV_ICONS[group_name]}  {group_name}",
             key=f"nav_group_{group_name}",
             type="primary" if group_name == active_group else "secondary",
-            use_container_width=True,
+            width="stretch",
         ):
             st.session_state["active_page"] = group_pages[0]
             st.rerun()
@@ -1074,7 +1690,7 @@ if len(sub_pages) > 1:
                 short_label,
                 key=f"nav_page_{sub_page}",
                 type="primary" if sub_page == active_page else "secondary",
-                use_container_width=True,
+                width="stretch",
             ):
                 st.session_state["active_page"] = sub_page
                 st.rerun()
@@ -1138,14 +1754,14 @@ if page == "Executive Dashboard":
                           color_discrete_map={"Total inflow": "#16856B", "Total outflow": "#D95D5D"},
                           labels={"Amount": f"Amount ({currency_symbol})", "Flow": "Cash-flow category"})
         flow_fig.update_traces(textposition="outside", cliponaxis=False)
-        st.plotly_chart(style_fig(flow_fig, currency_symbol, height=330), use_container_width=True)
+        st.plotly_chart(style_fig(flow_fig, currency_symbol, height=330), width="stretch")
     with viz_right:
         composition = pd.DataFrame({"Category": ["Inflow", "Outflow"], "Amount": [max(total_inflow, 0), max(total_outflow, 0)]})
         composition_fig = px.pie(composition, names="Category", values="Amount", hole=0.68,
                                  color="Category", color_discrete_map={"Inflow": "#16856B", "Outflow": "#D95D5D"})
         composition_fig.update_traces(textposition="inside", textinfo="percent", insidetextfont=dict(size=13))
         composition_fig.update_layout(showlegend=True, legend_title_text="", margin=dict(l=10, r=10, t=35, b=10))
-        st.plotly_chart(style_fig(composition_fig, currency_symbol, height=330), use_container_width=True)
+        st.plotly_chart(style_fig(composition_fig, currency_symbol, height=330), width="stretch")
 
     left, right = st.columns([1, 2])
     with left:
@@ -1164,14 +1780,14 @@ if page == "Executive Dashboard":
             trend_fig.add_trace(go.Scatter(x=daily_df["date"], y=daily_df["inflow"], name="Inflow", mode="lines", line=dict(color="#16856B", width=2.5)))
             trend_fig.add_trace(go.Scatter(x=daily_df["date"], y=daily_df["outflow"], name="Outflow", mode="lines", line=dict(color="#D95D5D", width=2.5)))
             trend_fig.add_trace(go.Scatter(x=daily_df["date"], y=daily_df["net_flow"], name="Net flow", mode="lines", line=dict(color="#4778D0", width=2.5, dash="dot")))
-            st.plotly_chart(style_fig(trend_fig, currency_symbol, height=350), use_container_width=True)
+            st.plotly_chart(style_fig(trend_fig, currency_symbol, height=350), width="stretch")
         st.subheader("Net cash-flow history")
         if daily_df.empty:
             st.info("No usable cash-flow records to chart.")
         else:
             fig = px.line(daily_df, x="date", y="net_flow", markers=False, labels={"date": "Date / record", "net_flow": f"Net cash flow ({currency_symbol})"})
             fig.add_hline(y=0, line_dash="dash", line_color="#c2410c")
-            st.plotly_chart(style_fig(fig, currency_symbol), use_container_width=True)
+            st.plotly_chart(style_fig(fig, currency_symbol), width="stretch")
 
     st.subheader("Evidence-based observations")
     if total_inflow > 0:
@@ -1190,25 +1806,141 @@ if page == "Executive Dashboard":
 elif page == "Cash Flow & Forecast":
     if not require_data():
         st.stop()
-    st.caption("Forecasts are shown only when the configured project model returns valid predictions.")
-    horizon = st.slider("Forecast horizon (days)", min_value=7, max_value=60, value=30)
-    if st.button("Generate forecast", type="primary"):
-        forecast_df, forecast_error = get_forecast(df, horizon)
-        st.session_state["finmatrix_forecast"] = forecast_df
-        st.session_state["finmatrix_forecast_error"] = forecast_error
+
+    st.caption(
+        "Forecasts are model estimates. Historical validation compares predictions "
+        "against later observed records; it does not guarantee future performance."
+    )
+    horizon = st.slider(
+        "Forecast horizon (days)", min_value=7, max_value=60,
+        value=30, key="fm_forecast_horizon"
+    )
+
+    forecast_col, validation_col = st.columns(2)
+    with forecast_col:
+        if st.button("Generate forecast", type="primary", key="fm_generate_forecast"):
+            forecast_df, forecast_error = get_forecast(df, horizon)
+            st.session_state["finmatrix_forecast"] = forecast_df
+            st.session_state["finmatrix_forecast_error"] = forecast_error
+
+    with validation_col:
+        if st.button("Run historical validation", key="fm_run_forecast_validation"):
+            temporal_result, temporal_error = None, None
+            rolling_result, rolling_error = None, None
+
+            if evaluation_module is None:
+                temporal_error = "The evaluation engine could not be loaded."
+                rolling_error = temporal_error
+            else:
+                try:
+                    temporal_result = evaluation_module.evaluate_temporal_cashflow_forecasting(
+                        df.copy()
+                    )
+                except Exception as exc:
+                    temporal_error = str(exc)
+
+                try:
+                    rolling_result = evaluation_module.evaluate_rolling_origin_cashflow(
+                        df.copy()
+                    )
+                except Exception as exc:
+                    rolling_error = str(exc)
+
+            st.session_state["fm_temporal_validation"] = temporal_result
+            st.session_state["fm_temporal_validation_error"] = temporal_error
+            st.session_state["fm_rolling_validation"] = rolling_result
+            st.session_state["fm_rolling_validation_error"] = rolling_error
+
     forecast_df = st.session_state.get("finmatrix_forecast")
     forecast_error = st.session_state.get("finmatrix_forecast_error")
+
     if forecast_df is None:
-        st.warning(forecast_error or "No forecast has been generated in this session. Click Generate forecast.")
+        st.warning(
+            forecast_error
+            or "No forecast has been generated in this session. Click Generate forecast."
+        )
         st.caption("No random or synthetic prediction is substituted when the model is unavailable.")
     else:
         date_col, value_col = forecast_df.columns[0], forecast_df.columns[-1]
         prediction_total = float(forecast_df[value_col].sum())
-        st.metric(f"Sum of forecast values ({horizon}-day output)", money(prediction_total, currency_symbol))
-        st.caption("This is the sum of the model's returned values. Confirm whether the model output represents daily net flow or balance before interpreting it.")
-        fig = px.line(forecast_df, x=date_col, y=value_col, labels={date_col: "Forecast date", value_col: f"Model output ({currency_symbol})"})
-        st.plotly_chart(style_fig(fig, currency_symbol), use_container_width=True)
-        st.dataframe(forecast_df, use_container_width=True)
+        st.metric(
+            f"Sum of forecast values ({horizon}-day output)",
+            money(prediction_total, currency_symbol)
+        )
+        st.caption(
+            "This is the sum of the model's returned values. Confirm whether the "
+            "model output represents daily net flow or balance before interpreting it."
+        )
+        fig = px.line(
+            forecast_df, x=date_col, y=value_col,
+            labels={
+                date_col: "Forecast date",
+                value_col: f"Model output ({currency_symbol})"
+            }
+        )
+        st.plotly_chart(style_fig(fig, currency_symbol), width="stretch")
+        st.dataframe(forecast_df, width="stretch")
+
+    st.divider()
+    st.subheader("Historical forecast validation")
+    st.write(
+        "The evaluation uses chronological data splits and compares the ML model "
+        "with a simple baseline. Run it on your currently loaded dataset."
+    )
+
+    temporal = st.session_state.get("fm_temporal_validation")
+    temporal_error = st.session_state.get("fm_temporal_validation_error")
+    if temporal:
+        st.markdown("#### Level 1 ? Chronological holdout")
+        st.caption(
+            f"Training period: {temporal.get('train_period', 'N/A')} | "
+            f"Test period: {temporal.get('test_period', 'N/A')} | "
+            f"Training rows: {temporal.get('train_samples', 'N/A')} | "
+            f"Test rows: {temporal.get('test_samples', 'N/A')}"
+        )
+        baseline = temporal.get("baseline_metrics", {})
+        model = temporal.get("ml_model_metrics", {})
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Baseline MAE", baseline.get("MAE", "N/A"))
+        m2.metric("ML model MAE", model.get("MAE", "N/A"))
+        m3.metric("ML model RMSE", model.get("RMSE", "N/A"))
+        improvement = temporal.get("improvement_pct")
+        st.write(
+            "MAE improvement over baseline: "
+            + (f"{improvement:.2f}%" if improvement is not None else "Not defined (baseline MAE is zero).")
+        )
+        if improvement is not None and improvement > 0:
+            st.success("The ML model had lower MAE than the baseline on this holdout.")
+        elif improvement is not None:
+            st.warning("The ML model did not outperform the baseline on this holdout.")
+        st.caption(temporal.get("leakage_safeguards", "Chronological split used."))
+    elif temporal_error:
+        st.warning(f"Chronological validation unavailable: {temporal_error}")
+
+    rolling = st.session_state.get("fm_rolling_validation")
+    rolling_error = st.session_state.get("fm_rolling_validation_error")
+    if rolling:
+        st.markdown("#### Level 2 ? Rolling-origin validation")
+        r1, r2, r3 = st.columns(3)
+        r1.metric("Mean baseline MAE", rolling.get("mean_baseline_MAE", "N/A"))
+        r2.metric("Mean model MAE", rolling.get("mean_model_MAE", "N/A"))
+        folds_won = rolling.get("folds_model_beats_baseline", 0)
+        total_folds = len(rolling.get("folds", []))
+        r3.metric("Folds beating baseline", f"{folds_won}/{total_folds}")
+        fold_rows = rolling.get("folds", [])
+        if fold_rows:
+            st.dataframe(pd.DataFrame(fold_rows), width="stretch")
+        st.warning(rolling.get(
+            "warning",
+            "Results on this dataset do not establish real-world SME performance."
+        ))
+    elif rolling_error:
+        st.warning(f"Rolling-origin validation unavailable: {rolling_error}")
+
+    st.caption(
+        "Validation metrics are calculated on the loaded dataset, not independent "
+        "external SME data. They should not be presented as proof of generalization."
+    )
 
 # ---------------------------------------------------------------------------
 # Page: What-if scenario
@@ -1236,7 +1968,7 @@ elif page == "What-If Scenario Simulator":
     m3.metric("Change", money(simulated_net - baseline_net, currency_symbol))
     chart_df = pd.DataFrame({"Record": np.arange(1, len(df) + 1), "Baseline net flow": df["inflow"] - df["outflow"], "Scenario net flow": scenario_net})
     fig = px.line(chart_df, x="Record", y=["Baseline net flow", "Scenario net flow"], labels={"value": f"Net cash flow ({currency_symbol})", "Record": "Record"})
-    st.plotly_chart(style_fig(fig, currency_symbol), use_container_width=True)
+    st.plotly_chart(style_fig(fig, currency_symbol), width="stretch")
     if simulated_net < safety_threshold:
         st.warning("Scenario total is below the configured safety buffer. Review assumptions and timing before acting.")
     st.caption("The scenario applies the selected percentages uniformly to every loaded record. It does not model seasonality, payment delays, or behavior changes.")
@@ -1298,6 +2030,7 @@ elif page == "AI Financial Copilot":
             st.session_state.chat_messages.append({"role": "user", "content": prompt})
             with st.chat_message("user"):
                 st.write(prompt)
+            result = None
             try:
                 result = engine.process_query(prompt)
                 if isinstance(result, dict):
@@ -1307,11 +2040,36 @@ elif page == "AI Financial Copilot":
                     if intent is not None:
                         answer += f"\n\nIntent: {intent}"
                     if confidence is not None:
-                        answer += f" Â· Confidence: {confidence}"
+                        answer += f"  |  Confidence: {confidence}"
                 else:
                     answer = str(result)
-            except Exception as exc:
-                answer = f"The copilot could not process this question: {exc}"
+                    intent = None
+
+                # Use the LLM only for the general-assistance fallback.
+                # Deterministic forecasts, stress calculations, policy evidence,
+                # and security refusals must remain unchanged.
+                if (
+                    isinstance(result, dict)
+                    and result.get("intent") == "General Assistance"
+                    and llm_module is not None
+                    and getattr(llm_module, "is_enabled", lambda: False)()
+                    and hasattr(llm_module, "answer_query")
+                ):
+                    direct_answer = llm_module.answer_query(prompt)
+                    if direct_answer:
+                        answer = direct_answer
+                        intent = "AI Financial Assistant"
+
+                # Do not run rewrite_answer() here: it creates a second LLM
+                # call and could alter a response that should remain deterministic.
+
+            except Exception:
+                logging.exception("FinMatrix Copilot query processing failed")
+                answer = (
+                    "The copilot could not process this question. "
+                    "Please try again. If the issue continues, "
+                    "check the application logs."
+                )
             st.session_state.chat_messages.append({"role": "assistant", "content": answer})
             current_chat_id = st.session_state.get("active_chat_id")
             current_title = st.session_state.get("active_chat_title", "New chat")
@@ -1323,14 +2081,57 @@ elif page == "AI Financial Copilot":
                 save_chat(chat_owner_id, current_chat_id, current_title, st.session_state.chat_messages, current_pin)
             with st.chat_message("assistant"):
                 st.write(answer)
+                if (
+                    isinstance(result, dict)
+                    and result.get("intent") == "Regulatory Policy RAG"
+                ):
+                    evidence_items = result.get("policy_evidence", [])
+                    if isinstance(evidence_items, list) and evidence_items:
+                        with st.expander("Retrieved Policy Evidence", expanded=False):
+                            st.caption(
+                                "Local retrieval evidence only. Relevance does not "
+                                "verify that a source is official, current, or legally applicable."
+                            )
+                            for evidence_index, evidence_item in enumerate(
+                                evidence_items, start=1
+                            ):
+                                if not isinstance(evidence_item, dict):
+                                    continue
+                                excerpt = str(evidence_item.get("excerpt") or "").strip()
+                                source = str(
+                                    evidence_item.get("source") or "Source unavailable"
+                                )
+                                section = str(
+                                    evidence_item.get("section") or "Section unavailable"
+                                )
+                                st.markdown(f"**Evidence {evidence_index}**")
+                                effective_date = str(evidence_item.get("effective_date") or "Not verified")
+                                st.caption(
+                                    f"Source: {source} | Section: {section} | "
+                                    f"Effective date: {effective_date}"
+                                )
+                                score = evidence_item.get("relevance_score")
+                                if isinstance(score, (int, float)) and not isinstance(score, bool):
+                                    st.caption(f"Lexical relevance score: {score:.4f}")
+                                if excerpt:
+                                    st.text(excerpt)
+                                else:
+                                    st.caption("No excerpt text was provided.")
+                    else:
+                        st.caption(
+                            "No policy evidence excerpts were retrieved; "
+                            "the current policy details remain unconfirmed."
+                        )
         active_chat_id = st.session_state.get("active_chat_id")
         if active_chat_id:
             active_title = st.session_state.get("active_chat_title", "New chat")
             save_chat(chat_owner_id, active_chat_id, active_title, st.session_state.chat_messages, next((c["is_pinned"] for c in list_chats(chat_owner_id) if c["chat_id"] == active_chat_id), False))
         if st.button("Clear current conversation", key="fm_clear_current_chat"):
-            st.session_state.chat_messages = [{"role": "assistant", "content": "Conversation cleared. Ask a new question about the currently loaded financial data."}]
-            if active_chat_id:
-                save_chat(chat_owner_id, active_chat_id, st.session_state.get("active_chat_title", "New chat"), st.session_state.chat_messages)
+            # Preserve the existing conversation in history and start a separate chat.
+            new_id, new_messages = create_chat(chat_owner_id, title="New chat")
+            st.session_state["active_chat_id"] = new_id
+            st.session_state["active_chat_title"] = "New chat"
+            st.session_state["chat_messages"] = new_messages
             st.rerun()
 
 # ---------------------------------------------------------------------------
@@ -1345,43 +2146,58 @@ elif page == "Regulatory Policy Search":
         elif retrieval_module is None:
             st.error("The retrieval module `src/retrieval.py` could not be imported.")
         else:
-            retriever = None
-            for class_name in ("PolicyRetriever", "RAGRetriever", "PolicySearchEngine", "Retriever"):
-                cls = getattr(retrieval_module, class_name, None)
-                if cls is not None:
-                    try:
-                        retriever = cls(docs_path=str(BASE_DIR / "docs"))
-                    except TypeError:
-                        try:
-                            retriever = cls()
-                        except Exception:
-                            retriever = None
-                    except Exception:
-                        retriever = None
-                    if retriever is not None:
-                        break
-            if retriever is None or not hasattr(retriever, "search"):
-                st.error("No compatible retriever with a search(query) method was found.")
-            else:
-                try:
-                    results = retriever.search(query)
-                    if not results:
-                        st.info("No matching policy passages were returned. Check the indexed documents and query.")
-                    else:
-                        for idx, item in enumerate(results, 1):
-                            if isinstance(item, dict):
-                                text = item.get("text") or item.get("content") or str(item)
-                                source = item.get("source") or item.get("filename")
-                                if source:
-                                    st.markdown(f"**Result {idx} Â· Source: {source}**")
-                                else:
-                                    st.markdown(f"**Result {idx}**")
-                                st.write(text)
-                            else:
-                                st.write(f"**Result {idx}**")
-                                st.write(str(item))
-                except Exception as exc:
-                    st.error(f"Policy search failed: {exc}")
+            try:
+                retriever = retrieval_module.PolicyRAGEngine(
+                    docs_dir=str(BASE_DIR / "data" / "rag_docs")
+                )
+                results = retriever.query_policy(query, top_k=5)
+
+                if not results:
+                    st.info(
+                        "No matching policy evidence was found in the currently "
+                        "indexed, non-quarantined documents."
+                    )
+                else:
+                    st.caption(
+                        "Results are retrieval matches, not confirmation that a "
+                        "circular is current, authoritative, or legally applicable."
+                    )
+                    for idx, item in enumerate(results, 1):
+                        if not isinstance(item, dict):
+                            st.write(f"**Result {idx}**")
+                            st.write(str(item))
+                            continue
+
+                        source = item.get("source") or item.get("filename") or "Unknown source"
+                        section = item.get("section")
+                        evidence = (
+                            item.get("text")
+                            or item.get("excerpt")
+                            or item.get("content")
+                            or ""
+                        )
+                        effective_date = item.get("effective_date")
+                        score = item.get("relevance_score", item.get("similarity"))
+
+                        heading = f"Result {idx} | Source: {source}"
+                        if section:
+                            heading += f" | Section: {section}"
+                        st.markdown(f"**{heading}**")
+
+                        metadata = []
+                        if effective_date:
+                            metadata.append(f"Effective date: {effective_date}")
+                        if isinstance(score, (int, float)):
+                            metadata.append(f"Relevance score: {score:.3f}")
+                        if metadata:
+                            st.caption(" | ".join(metadata))
+
+                        if evidence:
+                            st.write(evidence)
+                        else:
+                            st.warning("A result was returned without readable evidence text.")
+            except Exception as exc:
+                st.error(f"Policy search failed: {exc}")
 
 # ---------------------------------------------------------------------------
 # Page: Security / guardrail check
@@ -1394,19 +2210,25 @@ elif page == "Security & Guardrail Audit":
             st.warning("The safety module could not be imported; no configured guardrail was run.")
         else:
             try:
-                if hasattr(safety_module, "validate_input"):
-                    result = safety_module.validate_input(prompt_text)
-                    st.write(result)
-                elif hasattr(safety_module, "Guardrail"):
-                    guard = safety_module.Guardrail()
-                    if hasattr(guard, "validate_input"):
-                        st.write(guard.validate_input(prompt_text))
-                    elif hasattr(guard, "validate"):
-                        st.write(guard.validate(prompt_text))
+                if hasattr(safety_module, "sanitize_text_input"):
+                    sanitized, is_threat, triggered_rules = (
+                        safety_module.sanitize_text_input(prompt_text)
+                    )
+                    if is_threat:
+                        st.error("Potential prompt-injection pattern detected.")
                     else:
-                        st.warning("Guardrail class found, but no supported validate method was found.")
+                        st.success("No known prompt-injection pattern detected.")
+
+                    st.write("**Sanitized input**")
+                    st.code(sanitized or "(empty input)")
+                    st.write("**Detection rules triggered**")
+                    if triggered_rules:
+                        for rule in triggered_rules:
+                            st.write(f"- {rule}")
+                    else:
+                        st.write("No known detection rules were triggered.")
                 else:
-                    st.warning("No supported validate_input function or Guardrail class was found.")
+                    st.warning("The configured safety module has no supported sanitizer.")
             except Exception as exc:
                 st.error(f"Guardrail validation failed: {exc}")
 
@@ -1467,9 +2289,9 @@ elif page == "Data Quality & Preview":
         "Missing values": [int(df[col].isna().sum()) for col in df.columns],
         "Unique values": [int(df[col].nunique(dropna=True)) for col in df.columns],
     })
-    st.dataframe(quality, use_container_width=True, hide_index=True)
+    st.dataframe(quality, width="stretch", hide_index=True)
     st.subheader("Normalized data preview")
-    st.dataframe(df.head(500), use_container_width=True, hide_index=True)
+    st.dataframe(df.head(500), width="stretch", hide_index=True)
     if "trans_date" in df.columns:
         invalid_dates = int(df["trans_date"].isna().sum())
         if invalid_dates:
@@ -1508,7 +2330,7 @@ elif page == "About FinMatrix":
         "replace accountants, lenders, or regulated financial professionals."
     )
     st.markdown("### Team")
-    st.write("**Team:** inMatrixDUO Â· **Project:** FinMatrix Copilot")
+    st.write("**Team:** FinMatrix DUO  |  **Project:** FinMatrix Copilot")
     st.markdown("### Responsible-use principles")
     st.markdown(
         "- Uses uploaded or explicitly labeled demo data; it does not claim demo records are real customer accounts.\\n"
@@ -1598,4 +2420,4 @@ elif page == "User Settings":
     st.caption("Light/Dark appearance is applied across the app content and saved to your account (or this demo session). Streamlit's outer browser chrome is controlled by Streamlit settings.")
 
 st.divider()
-st.caption("FinMatrix Copilot Â· Financial calculations use loaded records. Forecasts and policy answers are shown only when configured modules return results.")
+st.caption("FinMatrix Copilot  |  Financial calculations use loaded records. Forecasts and policy answers are shown only when configured modules return results.")

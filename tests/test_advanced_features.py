@@ -14,6 +14,7 @@ import pandas as pd
 from src.data_loader import clean_and_validate_sme_data
 from src.audit_logger import AuditLogger
 from src.report_generator import ExecutiveReportGenerator
+from src.agent import SMEFinanceAgent
 
 
 def test_data_loader_cleaning():
@@ -116,3 +117,111 @@ def test_report_generator():
 
             if not os.listdir(test_dir):
                 os.rmdir(test_dir)
+
+
+def test_agent_reports_no_current_cash_burn_without_fake_runway():
+    agent = SMEFinanceAgent()
+    result = agent.process_query(
+        "Check my financial health and runway",
+        {"inflow": 200000, "outflow": 150000, "cash_reserve": 300000},
+    )
+
+    assert "No current cash burn" in result["response_summary"]
+    assert "999 months" not in result["response_summary"]
+    assert "None months" not in result["response_summary"]
+
+
+def test_agent_reports_numeric_runway_when_cash_flow_is_negative():
+    agent = SMEFinanceAgent()
+    result = agent.process_query(
+        "Check my financial health and runway",
+        {"inflow": 100000, "outflow": 150000, "cash_reserve": 100000},
+    )
+
+    assert "2.0 months" in result["response_summary"]
+    assert "None months" not in result["response_summary"]
+
+
+def test_agent_requires_real_context_before_financial_calculation():
+    agent = SMEFinanceAgent()
+    result = agent.process_query("Check my financial health and runway")
+
+    assert result["status"] == "Needs Data"
+    assert result["calculated_metrics"] is None
+    assert set(result["missing_fields"]) == {
+        "inflow", "outflow", "cash_reserve"
+    }
+    assert "assumed" in result["response_summary"].lower()
+
+
+def test_agent_rejects_invalid_financial_inputs():
+    agent = SMEFinanceAgent()
+    result = agent.process_query(
+        "Check my financial health",
+        {"inflow": float("nan"), "outflow": 100, "cash_reserve": 500},
+    )
+
+    assert result["status"] == "Invalid Data"
+    assert result["calculated_metrics"] is None
+
+
+def test_agent_labels_retrieved_policy_as_unverified_evidence(monkeypatch):
+    agent = SMEFinanceAgent()
+    retrieved = [{
+        "source": "example_circular.pdf",
+        "section": "page-1",
+        "text": "Eligible SMEs may apply under the stated facility.",
+        "effective_date": None,
+        "relevance_score": 0.54,
+    }]
+    monkeypatch.setattr(
+        agent.rag_engine,
+        "query_policy",
+        lambda query, top_k=2: retrieved,
+    )
+
+    result = agent.process_query(
+        "What is the current SME loan interest rate?"
+    )
+    summary = result["response_summary"].lower()
+
+    assert result["status"] == "Evidence Retrieved (Unverified)"
+    assert result["citations"] == ["example_circular.pdf"]
+    assert "not a confirmed answer" in summary
+    assert "does not establish" in summary
+    assert "effective date: not verified" in summary
+    assert "eligible smes may apply" in summary
+
+
+def test_agent_treats_empty_retrieved_excerpts_as_no_match(monkeypatch):
+    agent = SMEFinanceAgent()
+    monkeypatch.setattr(
+        agent.rag_engine,
+        "query_policy",
+        lambda query, top_k=2: [
+            {"source": "empty.pdf", "text": "   "}
+        ],
+    )
+
+    result = agent.process_query("Tell me the applicable SME policy.")
+
+    assert result["status"] == "No Match"
+    assert result["citations"] == []
+    assert result["retrieved_context"] == []
+    assert "cannot confirm" in result["response_summary"].lower()
+
+
+def test_agent_reports_no_match_when_policy_retrieval_is_empty(monkeypatch):
+    agent = SMEFinanceAgent()
+    monkeypatch.setattr(
+        agent.rag_engine, "query_policy", lambda query, top_k=2: []
+    )
+
+    result = agent.process_query(
+        "What policy applies to an unrelated question?"
+    )
+
+    assert result["status"] == "No Match"
+    assert result["citations"] == []
+    assert result["retrieved_context"] == []
+    assert "cannot confirm" in result["response_summary"].lower()

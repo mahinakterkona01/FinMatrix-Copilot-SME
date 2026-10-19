@@ -11,6 +11,13 @@ from typing import Dict, Any
 
 
 class ExecutiveReportGenerator:
+    @staticmethod
+    def _format_runway(value: Any) -> str:
+        """Format runway without presenting a placeholder as a real estimate."""
+        if value is None:
+            return "No current cash burn"
+        return f"{value} months"
+
     def __init__(self, output_dir: str = "data/reports"):
         self.output_dir = output_dir
         os.makedirs(self.output_dir, exist_ok=True)
@@ -25,7 +32,7 @@ class ExecutiveReportGenerator:
             {"Category": "Metric", "Key": "Net Cash Flow", "Value": str(metrics.get("net_cash_flow", 0.0))},
             {"Category": "Metric", "Key": "Operating Margin (%)", "Value": str(metrics.get("operating_margin_pct", 0.0))},
             {"Category": "Metric", "Key": "Monthly Burn Rate", "Value": str(metrics.get("monthly_burn_rate", 0.0))},
-            {"Category": "Metric", "Key": "Estimated Runway (Months)", "Value": str(metrics.get("estimated_runway_months", 0.0))},
+            {"Category": "Metric", "Key": "Estimated Runway", "Value": self._format_runway(metrics.get("estimated_runway_months"))},
             {"Category": "Metric", "Key": "Health Status", "Value": str(metrics.get("health_status", "N/A"))},
         ]
         
@@ -37,7 +44,7 @@ class ExecutiveReportGenerator:
         """Generates a structured text executive report suitable for PDF conversion or plain display."""
         report = f"""
 ================================================================================
-                    FINPILOT AI — EXECUTIVE FINANCIAL AUDIT REPORT
+                    FINMATRIX — EXECUTIVE FINANCIAL AUDIT REPORT
 ================================================================================
 Generated On: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 Target Entity: SME Business Partner
@@ -48,7 +55,7 @@ Benchmarked Currency: USD ($) / BDT (৳)
    - Net Monthly Cash Flow : {metrics.get('net_cash_flow', 0.0):,.2f}
    - Operating Margin       : {metrics.get('operating_margin_pct', 0.0)}%
    - Monthly Burn Rate      : {metrics.get('monthly_burn_rate', 0.0):,.2f}
-   - Estimated Runway       : {metrics.get('estimated_runway_months', 0.0)} Months
+   - Estimated Runway       : {self._format_runway(metrics.get('estimated_runway_months'))}
    - Health Classification  : {metrics.get('health_status', 'N/A')}
 
 2. INVOICE CREDIT RISK ASSESSMENT
@@ -76,7 +83,7 @@ if __name__ == "__main__":
         "net_cash_flow": 7000.0,
         "operating_margin_pct": 28.0,
         "monthly_burn_rate": 0.0,
-        "estimated_runway_months": 999.0,
+        "estimated_runway_months": None,
         "health_status": "Healthy"
     }
     dummy_risk = {"risk_score": 0.45, "risk_level": "Medium"}

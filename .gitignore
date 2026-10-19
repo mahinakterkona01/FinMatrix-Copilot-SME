@@ -10,3 +10,9 @@ data/raw/
 *.backup*
 data/processed/
 *.db
+quarantine_cleanup/
+
+# Local safety backups; retain files locally, exclude from Git
+*.bak
+*.bak.*
+.streamlit/secrets.toml

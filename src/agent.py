@@ -22,35 +22,142 @@ class SMEFinanceAgent:
 
         # 1. Financial Health & Ledger Analytics Route
         if any(keyword in query_lower for keyword in ["health", "ratio", "cashflow", "runway", "burn"]):
-            inflow = context_data.get("inflow", 150000) if context_data else 150000
-            outflow = context_data.get("outflow", 110000) if context_data else 110000
-            cash_reserve = context_data.get("cash_reserve", 200000) if context_data else 200000
+            required_fields = ("inflow", "outflow", "cash_reserve")
+            if not isinstance(context_data, dict):
+                context_data = {}
+
+            missing_fields = [
+                field for field in required_fields
+                if context_data.get(field) is None
+            ]
+            if missing_fields:
+                readable = ", ".join(missing_fields)
+                return {
+                    "intent": "Financial Analytics",
+                    "status": "Needs Data",
+                    "calculated_metrics": None,
+                    "missing_fields": missing_fields,
+                    "response_summary": (
+                        "I cannot calculate financial health or cash runway yet. "
+                        f"Please provide these values: {readable}. "
+                        "No financial figures have been assumed."
+                    ),
+                }
+
+            try:
+                inflow, outflow, cash_reserve = (
+                    float(context_data[field]) for field in required_fields
+                )
+            except (TypeError, ValueError, OverflowError):
+                return {
+                    "intent": "Financial Analytics",
+                    "status": "Invalid Data",
+                    "calculated_metrics": None,
+                    "response_summary": (
+                        "Financial inputs must be valid numeric values. "
+                        "Please check inflow, outflow, and cash reserve."
+                    ),
+                }
+
+            import math
+            if (
+                not all(math.isfinite(value) for value in
+                        (inflow, outflow, cash_reserve))
+                or min(inflow, outflow, cash_reserve) < 0
+            ):
+                return {
+                    "intent": "Financial Analytics",
+                    "status": "Invalid Data",
+                    "calculated_metrics": None,
+                    "response_summary": (
+                        "Financial inputs must be finite, non-negative numbers. "
+                        "Please correct the values and try again."
+                    ),
+                }
 
             metrics = calculate_sme_financial_health(inflow, outflow, cash_reserve)
+            runway = metrics["estimated_runway_months"]
+            runway_text = (
+                f"{runway} months"
+                if runway is not None
+                else "No current cash burn"
+            )
             return {
                 "intent": "Financial Analytics",
                 "status": "Success",
                 "calculated_metrics": metrics,
                 "response_summary": (
-                    f"Financial Health Audit Completed. Net Cash Flow: {metrics['net_cash_flow']} BDT. "
-                    f"Operating Margin: {metrics['operating_margin_pct']}%. Estimated Runway: {metrics['estimated_runway_months']} months."
+                    f"Financial Health Audit Completed. Net Cash Flow: {metrics['net_cash_flow']} (currency not specified). "
+                    f"Operating Margin: {metrics['operating_margin_pct']}%. Estimated Runway: {runway_text}."
                 )
             }
 
         # 2. Policy & Refinance Regulation Route (RAG)
         else:
             retrieved_policies = self.rag_engine.query_policy(query, top_k=2)
-            top_policy = retrieved_policies[0] if retrieved_policies else {}
+            if not retrieved_policies:
+                return {
+                    "intent": "Policy Information (RAG)",
+                    "status": "No Match",
+                    "citations": [],
+                    "retrieved_context": [],
+                    "response_summary": (
+                        "I could not find a relevant policy in the available "
+                        "indexed documents. I cannot confirm an answer from "
+                        "the current knowledge base."
+                    ),
+                }
+
+            usable_evidence = [
+                doc for doc in retrieved_policies
+                if isinstance(doc.get("text"), str) and doc["text"].strip()
+            ]
+            if not usable_evidence:
+                return {
+                    "intent": "Policy Information (RAG)",
+                    "status": "No Match",
+                    "citations": [],
+                    "retrieved_context": [],
+                    "response_summary": (
+                        "The retrieval system returned no usable policy excerpts. "
+                        "I cannot confirm the requested policy details."
+                    ),
+                }
+
+            citations = [
+                doc["source"] for doc in usable_evidence if doc.get("source")
+            ]
+            evidence_lines = []
+            for doc in usable_evidence:
+                source = doc.get("source") or "Source unavailable"
+                section = doc.get("section") or "Section unavailable"
+                effective_date = doc.get("effective_date") or "Not verified"
+                score = doc.get("relevance_score")
+                score_text = (
+                    f"{score}" if isinstance(score, (int, float))
+                    else "Not available"
+                )
+                evidence_lines.append(
+                    f"[Source: {source}; Section: {section}; "
+                    f"Effective date: {effective_date}; "
+                    f"Retrieval relevance score: {score_text}]\n"
+                    f"{doc['text'].strip()}"
+                )
 
             return {
                 "intent": "Policy Information (RAG)",
-                "status": "Success",
-                "citations": [doc["source"] for doc in retrieved_policies],
-                "retrieved_context": retrieved_policies,
+                "status": "Evidence Retrieved (Unverified)",
+                "citations": citations,
+                "retrieved_context": usable_evidence,
                 "response_summary": (
-                    f"Grounded Policy Response: {top_policy.get('text', 'No policy matched.')} "
-                    f"[Source Citation: {top_policy.get('source', 'N/A')}]"
-                )
+                    "I found potentially relevant policy excerpt(s), but these "
+                    "are not a confirmed answer to your question. Retrieval "
+                    "relevance does not establish that a document is official, "
+                    "current, or legally applicable. Verify the original "
+                    "circular, effective date, and amendments before making a "
+                    "financial decision.\n\n"
+                    + "\n\n".join(evidence_lines)
+                ),
             }
 
 

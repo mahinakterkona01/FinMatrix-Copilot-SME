@@ -1,0 +1,196 @@
+{
+  "benchmark_name": "FinMatrix policy source retrieval development benchmark",
+  "dataset_path": "data/rag_benchmark_queries.json",
+  "corpus_path": "data/rag_docs",
+  "indexed_chunk_count": 1,
+  "indexed_sources": [
+    "jul022026smespdl03e.pdf"
+  ],
+  "index_build_ms": 32.955,
+  "summary": {
+    "case_count": 9,
+    "relevant_case_count": 7,
+    "negative_case_count": 2,
+    "source_accuracy_at_1": 0.2857142857142857,
+    "source_hit_rate_at_3": 0.2857142857142857,
+    "negative_abstention_accuracy": 1.0,
+    "latency_ms_median": 0.5927499878453091,
+    "latency_ms_p95": 0.8892000187188387,
+    "latency_sample_count": 180,
+    "metric_scope": "Small manually labelled development set; distinct-source retrieval only. Not answer correctness, official policy verification, or external validation."
+  },
+  "cases": [
+    {
+      "id": "bb03_jica_project",
+      "query": "JICA assisted Urban Building Safety Project UBSP BD-P84",
+      "expected_source": "jul022026smespdl03e.pdf",
+      "should_abstain": false,
+      "retrieved_sources": [
+        "jul022026smespdl03e.pdf"
+      ],
+      "retrieved_unique_sources": [
+        "jul022026smespdl03e.pdf"
+      ],
+      "expected_source_rank": 1,
+      "retrieved_scores": [
+        0.5726
+      ],
+      "result_count": 1,
+      "rank_1_hit": true,
+      "hit_at_3": true,
+      "returned_any": true,
+      "median_query_latency_ms": 0.5951000202912837
+    },
+    {
+      "id": "bb03_npl_threshold",
+      "query": "Non-Performing Loans NPL ratio not exceeding 20 percent",
+      "expected_source": "jul022026smespdl03e.pdf",
+      "should_abstain": false,
+      "retrieved_sources": [
+        "jul022026smespdl03e.pdf"
+      ],
+      "retrieved_unique_sources": [
+        "jul022026smespdl03e.pdf"
+      ],
+      "expected_source_rank": 1,
+      "retrieved_scores": [
+        0.2834
+      ],
+      "result_count": 1,
+      "rank_1_hit": true,
+      "hit_at_3": true,
+      "returned_any": true,
+      "median_query_latency_ms": 0.5923999997321516
+    },
+    {
+      "id": "bb04_refinance_fund",
+      "query": "CMSME current working capital refinance fund",
+      "expected_source": "sep202026smespdl04.pdf",
+      "should_abstain": false,
+      "retrieved_sources": [],
+      "retrieved_unique_sources": [],
+      "expected_source_rank": null,
+      "retrieved_scores": [],
+      "result_count": 0,
+      "rank_1_hit": false,
+      "hit_at_3": false,
+      "returned_any": false,
+      "median_query_latency_ms": 0.586300011491403
+    },
+    {
+      "id": "bb04_finance_companies",
+      "query": "Circular Letter No 04 finance companies eligible for refinancing",
+      "expected_source": "sep202026smespdl04.pdf",
+      "should_abstain": false,
+      "retrieved_sources": [
+        "jul022026smespdl03e.pdf"
+      ],
+      "retrieved_unique_sources": [
+        "jul022026smespdl03e.pdf"
+      ],
+      "expected_source_rank": null,
+      "retrieved_scores": [
+        0.2024
+      ],
+      "result_count": 1,
+      "rank_1_hit": false,
+      "hit_at_3": false,
+      "returned_any": true,
+      "median_query_latency_ms": 0.6354000070132315
+    },
+    {
+      "id": "bb05_udyog_youth",
+      "query": "UDYOG young entrepreneur program age 28",
+      "expected_source": "sep132026smespd05.pdf",
+      "should_abstain": false,
+      "retrieved_sources": [],
+      "retrieved_unique_sources": [],
+      "expected_source_rank": null,
+      "retrieved_scores": [],
+      "result_count": 0,
+      "rank_1_hit": false,
+      "hit_at_3": false,
+      "returned_any": false,
+      "median_query_latency_ms": 0.5717000167351216
+    },
+    {
+      "id": "bb05_lead_bank",
+      "query": "UDYOG district lead bank selection for young entrepreneurs",
+      "expected_source": "sep132026smespd05.pdf",
+      "should_abstain": false,
+      "retrieved_sources": [
+        "jul022026smespdl03e.pdf"
+      ],
+      "retrieved_unique_sources": [
+        "jul022026smespdl03e.pdf"
+      ],
+      "expected_source_rank": null,
+      "retrieved_scores": [
+        0.1718
+      ],
+      "result_count": 1,
+      "rank_1_hit": false,
+      "hit_at_3": false,
+      "returned_any": true,
+      "median_query_latency_ms": 0.5849000008311123
+    },
+    {
+      "id": "bb05_grant",
+      "query": "UDYOG financial assistance grant alongside bank loan",
+      "expected_source": "sep132026smespd05.pdf",
+      "should_abstain": false,
+      "retrieved_sources": [
+        "jul022026smespdl03e.pdf"
+      ],
+      "retrieved_unique_sources": [
+        "jul022026smespdl03e.pdf"
+      ],
+      "expected_source_rank": null,
+      "retrieved_scores": [
+        0.162
+      ],
+      "result_count": 1,
+      "rank_1_hit": false,
+      "hit_at_3": false,
+      "returned_any": true,
+      "median_query_latency_ms": 0.6247000128496438
+    },
+    {
+      "id": "negative_cake",
+      "query": "chocolate cake baking recipe",
+      "expected_source": null,
+      "should_abstain": true,
+      "retrieved_sources": [],
+      "retrieved_unique_sources": [],
+      "expected_source_rank": null,
+      "retrieved_scores": [],
+      "result_count": 0,
+      "rank_1_hit": null,
+      "hit_at_3": null,
+      "returned_any": false,
+      "median_query_latency_ms": 0.6010999786667526
+    },
+    {
+      "id": "negative_weather",
+      "query": "weather forecast temperature tomorrow",
+      "expected_source": null,
+      "should_abstain": true,
+      "retrieved_sources": [],
+      "retrieved_unique_sources": [],
+      "expected_source_rank": null,
+      "retrieved_scores": [],
+      "result_count": 0,
+      "rank_1_hit": null,
+      "hit_at_3": null,
+      "returned_any": false,
+      "median_query_latency_ms": 0.5871999892406166
+    }
+  ],
+  "limitations": [
+    "Small manually labelled development set; not an external test set.",
+    "Source retrieval metrics do not establish answer correctness.",
+    "PDF extraction quality and document authority are not independently verified.",
+    "Latency is local-process timing and depends on hardware and runtime state.",
+    "The first index build is reported separately from warmed query latency."
+  ]
+}

@@ -1,75 +1,100 @@
-# ⚡ FinMatrix Copilot — SME Financial Co-Pilot
+# FinMatrix Copilot
 
-**Official Submission for 2026 Shenzhen International FinTech Competition (FinTechathon 2026)**  
-**Track / Topic:** Topic E — SME Finance Copilot  
-**Team Identity:** `Team FinMatrixDUO`  
+**AI-Powered Financial Intelligence for SMEs**.
 
----
-
-## 📌 Executive Overview
-
-**FinMatrix Copilot** is an enterprise-grade AI financial decision-support and liquidity intelligence engine designed for Small and Medium Enterprises (SMEs). Standard conversational financial assistants often suffer from arithmetic hallucinations and lookahead data leakage in forecasting. 
-
-FinMatrix Copilot addresses these gaps by decoupling deterministic numerical execution from language models, enforcing strict Level 1 Temporal Holdout Validation for time-series forecasting, and embedding an adversarial guardrail layer for input security.
+**Team FinMatrixDUO**
+*Shenzhen FinTechathon 2026 Â· International Track*
 
 ---
 
-## 🚀 Key Functional Modules
+## Meet the Team
 
-1. **📊 Executive Financial Dashboard:** Multi-currency ($/৳/€/£/¥) and multi-sector operating environment with real-time liquidity safety threshold alerts and solvency gauge.
-2. **📈 ML Cash-Flow Forecaster:** Time-series forecasting using historical lag features ($t-1, t-7$) to project net liquidity trends without future lookahead bias.
-3. **🧪 What-If Stress Simulator:** Independent macro shock simulation evaluating revenue contractions and expense inflation on net liquidity.
-4. **🧾 Working Capital & Invoice Discounting:** Accelerated invoice settlement calculator providing effective annualized cost rate analysis for early liquidity.
-5. **📚 Policy Retrieval Engine (RAG):** Grounded policy search engine retrieving central bank SME circulars and financing guidelines with source citations.
-6. **🤖 Interactive AI Copilot:** Natural language financial guidance powered by context-aware execution and safety validation.
-7. **🛡️ Adversarial Security Guardrail:** Structural input filter intercepting prompt hijacking, SQL injection patterns, and unsafe commands.
-8. **📑 Institutional Audit Exporter:** Automated generation and download of structured financial audit reports.
+We are a student team exploring how AI and financial analytics can help small and medium-sized businesses make better-informed financial decisions.
 
----
+| Team Member | Role | Responsibilities |
 
-## 🛠️ System Architecture & Technology Stack
+|---|---|---|
+| Mahin Akter Kona | Team Leader | Project coordination, AI/ML development, and financial analysis |
+| Azmain Alam Khan | Team Member | Actual responsibilities in development, UI, testing, and research |
 
-FinMatrix-Copilot-SME/
-├── app.py                     # Streamlit High-Contrast Dashboard Interface
-├── src/                       # Core Analytical & Intelligence Engines
-│   ├── forecasting.py         # Time-Series ML Forecaster Engine
-│   ├── retrieval.py           # TF-IDF Policy Knowledge Search (RAG)
-│   ├── copilot.py             # Interactive Financial AI Engine
-│   ├── safety.py              # Adversarial Security Guardrails
-│   ├── financial_tools.py     # Solvency & Liquidity Metrics
-│   └── data_loader.py         # SME Ledger Ingestion & Normalization
-├── docs/                      # Research & Requirements Documentation
-├── notebooks/                 # Temporal Validation & EDA Notebooks
-├── data/raw/                  # Verified Primary SME Cash Flow Datasets
-├── requirements.txt           # Python Environment Dependencies
-└── LICENSE                    # MIT Open-Source License
+Together, we are developing FinMatrix Copilot as part of the Shenzhen FinTechathon 2026 International Track.
+*Shenzhen FinTechathon 2026 Â· International Track*
 
-* **Frontend & Dashboard:** Streamlit (High-Contrast Custom CSS Interface)
-* **Data Processing & Analytics:** Pandas, NumPy, Plotly Express
-* **Machine Learning & Time-Series:** Scikit-Learn (Random Forest Forecaster)
-* **Retrieval Engine (RAG):** TF-IDF Vectorization & Cosine Similarity
-* **Security & Testing:** Regex Pattern Matching Guardrails & Pytest Framework
+[ðŸš€ Live Demo](YOUR_STREAMLIT_APP_URL) Â· [ðŸ’» GitHub Repository](YOUR_GITHUB_REPOSITORY_URL)
 
 ---
 
-## 💻 Quick Start & Local Execution Guide
+## About the Project
 
-### 1. Repository Cloning & Environment Setup
+Running a business means making financial decisions every day. But when invoices, expenses, payments, and cash-flow records are spread across different files, understanding the full financial picture can take time.
 
-```powershell
-git clone [https://github.com/mahinakterkona01/FinMatrix-Copilot-SME.git](https://github.com/mahinakterkona01/FinMatrix-Copilot-SME.git)
-cd FinMatrix-Copilot-SME
+**We built FinMatrix Copilot to make that process easier.**
 
-Research & Validation Methodology
-FinMatrix Copilot enforces a 3-Level Evaluation Framework:
+FinMatrix Copilot is a Streamlit-based financial decision-support application that brings financial analysis, cash-flow insights, scenario calculations, reporting, and AI-assisted question answering into one workspace.
 
-Level 1 (Temporal Validation): Time-series data is split strictly chronologically to eliminate data leakage.
+Our goal is to help business owners explore their financial data, identify potential issues, understand possible outcomes, and make better-informed decisionsâ€”with calculations and evidence that can be reviewed rather than blindly trusting an AI response.
 
-Level 2 (Business-Level Validation): Evaluated across 4 distinct SME sectors (Retail, Technology/SaaS, Manufacturing, Logistics).
+Developed around the theme **â€œAI as a Financial Participant,â€** our project explores how AI can contribute to everyday financial workflows while keeping people responsible for the final decisions.
 
-Level 3 (External Policy Consistency): Grounded in official central bank SME working capital circulars and refinancing guidelines.
+## What We Have Built
 
-License & Copyright Notice
-Distributed under the MIT License. See LICENSE for full details.
+- **Financial data analysis** â€” We developed tools to process and normalize financial records so users can work with more consistent data.
+- **Cash-flow insights** â€” We incorporated financial analysis to help users examine money coming in and going out and understand their cash position.
+- **Financial scenario calculations** â€” We built tools for exploring how changes in financial assumptions can affect estimated outcomes.
+- **Invoice discounting calculations** â€” We included a calculator to explore the potential cost and implications of receiving invoice payments early.
+- **AI-assisted financial queries** â€” We developed a modular Copilot workflow that can use application logic and a configurable language-model integration.
+- **Policy and document retrieval** â€” We implemented retrieval components to search a configured knowledge base for information relevant to a user's question.
+- **Reporting and safeguards** â€” We worked on report generation, input validation, AI guardrails, and security-related checks to make the application easier to inspect and evaluate.
 
-Copyright (c) 2026 Team FinMatrixDUO.
+Feature availability may depend on the data provided and the application's configuration. External AI responses require a working, configured provider.
+
+## How It Works
+
+1. **Provide financial data** â€” Load the relevant records or use suitable demonstration data.
+2. **Explore the numbers** â€” Review the available financial analysis and calculated indicators.
+3. **Investigate a question** â€” Use supported financial tools or the configured Copilot and retrieval workflow.
+4. **Compare possible outcomes** â€” Explore supported scenarios and their assumptions.
+5. **Review before acting** â€” Check the underlying figures, evidence, and limitations before making a financial decision.
+
+We designed the application to support financial decision-making, not to make consequential financial decisions on behalf of a business.
+
+## Our Approach
+
+Rather than treating every financial question as a chatbot conversation, we combine ordinary Python-based financial logic with configurable AI assistance and document retrieval.
+
+This allows us to separate calculations from generated explanations, make scenario assumptions more visible, and work toward answers grounded in relevant information.
+
+We are also developing the project's testing and evaluation materials to examine financial calculations, retrieval quality, AI behavior, and security-related edge cases.
+
+## Documentation
+
+Explore the project documentation for system architecture, evaluation, requirements, security, and implementation details.
+
+| Document | Description |
+
+|---|---|
+| [System Architecture](docs/architecture.md) | System components, data flow, and overall architecture. |
+| [Evaluation Report](docs/evaluation_report.md) | Evaluation approach, testing scope, and known limitations. |
+| [Competition Requirements Matrix](docs/requirements_matrix.md) | Project requirements and submission checklist. |
+| [Security Self-Assessment](docs/security_self_assessment.md) | Security considerations, safeguards, and areas requiring verification. |
+| [Known Risks and Limitations](docs/known_risks.md) | Identified risks, limitations, and planned improvements. |
+| [Authentication and Configuration Setup](docs/authentication_setup.md) | Local setup, credentials, configuration, and authentication considerations. |
+| [LLM Integration](docs/llm_integration.md) | Language-model integration, retrieval considerations, and failure handling. |
+| [Problem Motivation and Research Gap](docs/research_gap.md) | Project motivation, design objectives, and evaluation direction. |
+
+### Additional Notes
+
+FinMatrix Copilot is a prototype for AI-assisted financial decision support. Its capabilities depend on the current implementation and configuration. Forecasts and AI-generated explanations should be reviewed before being used for financial decisions.
+
+Security, authentication, and deployment readiness should be assessed against the actual implementation rather than inferred from the documentation alone.
+
+## Built With
+
+**Python** Â· **Streamlit** Â· **Pandas** Â· **NumPy** Â· **Pytest** Â· **Modular financial tools** Â· **Retrieval-Augmented Generation (RAG)** Â· **Configurable LLM integration**
+
+---
+
+*We are building FinMatrix Copilot to make financial information easier to understand and use. The project is an evolving prototype, and its results should be reviewed before being used in real financial decisions.*
+
+**Team:** FinMatrixDUO
+**Competition:** Shenzhen FinTechathon 2026 â€” International Track
