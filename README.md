@@ -19,7 +19,7 @@ We are a student team exploring how AI and financial analytics can help small an
 Together, we are developing FinMatrix Copilot as part of the Shenzhen FinTechathon 2026 International Track.
 *Shenzhen FinTechathon 2026 · International Track*
 
-[Live Demo]https://finmatrix-copilot-sme-fzqfjy94f6marvqjc4phwu.streamlit.app/) | [GitHub Repository](https://github.com/mahinakterkona01/FinMatrix-Copilot-SME)
+[Live Demo](https://finmatrix-copilot-sme-fzqfjy94f6marvqjc4phwu.streamlit.app/) | [GitHub Repository](https://github.com/mahinakterkona01/FinMatrix-Copilot-SME)
 
 ---
 
