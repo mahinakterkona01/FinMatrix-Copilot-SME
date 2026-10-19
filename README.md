@@ -32,9 +32,9 @@ Running a business means making financial decisions every day. But when invoices
 
 FinMatrix Copilot is a Streamlit-based financial decision-support application that brings financial analysis, cash-flow insights, scenario calculations, reporting, and AI-assisted question answering into one workspace.
 
-Our goal is to help business owners explore their financial data, identify potential issues, understand possible outcomes, and make better-informed decisionsÃ¢â‚¬â€with calculations and evidence that can be reviewed rather than blindly trusting an AI response.
+Our goal is to help business owners explore their financial data, identify potential issues, understand possible outcomes, and make better-informed decisions with calculations and evidence that can be reviewed rather than blindly trusting an AI response.
 
-Developed around the theme **“AI as a Financial Participant,Ã¢â‚¬Â** our project explores how AI can contribute to everyday financial workflows while keeping people responsible for the final decisions.
+Developed around the theme **“AI as a Financial Participant,** our project explores how AI can contribute to everyday financial workflows while keeping people responsible for the final decisions.
 
 ## What We Have Built
 
