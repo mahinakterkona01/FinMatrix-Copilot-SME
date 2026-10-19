@@ -307,7 +307,7 @@ class AICopilotEngine:
 
         # Intent 3: Risk & Stress Testing
         elif any(w in query_lower for w in [
-            "shock", "stress", "cost", "risk", "delay"
+            "stress test", "stress scenario", "stress-test", "simulate", "simulation", "quantify impact", "calculate impact", "what-if", "what if", "financial shock", "scenario impact"
         ]):
             return {
                 "answer": (
