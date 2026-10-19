@@ -50,11 +50,11 @@ Feature availability may depend on the data provided and the application's confi
 
 ## How It Works
 
-1. **Provide financial data** Ã¢â‚¬â€ Load the relevant records or use suitable demonstration data.
-2. **Explore the numbers** Ã¢â‚¬â€ Review the available financial analysis and calculated indicators.
-3. **Investigate a question** Ã¢â‚¬â€ Use supported financial tools or the configured Copilot and retrieval workflow.
-4. **Compare possible outcomes** Ã¢â‚¬â€ Explore supported scenarios and their assumptions.
-5. **Review before acting** Ã¢â‚¬â€ Check the underlying figures, evidence, and limitations before making a financial decision.
+1. **Provide financial data** - Load the relevant records or use suitable demonstration data.
+2. **Explore the numbers** - Review the available financial analysis and calculated indicators.
+3. **Investigate a question** - Use supported financial tools or the configured Copilot and retrieval workflow.
+4. **Compare possible outcomes** - Explore supported scenarios and their assumptions.
+5. **Review before acting** - Check the underlying figures, evidence, and limitations before making a financial decision.
 
 We designed the application to support financial decision-making, not to make consequential financial decisions on behalf of a business.
 

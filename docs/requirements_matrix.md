@@ -16,7 +16,6 @@ A feature is not considered complete simply because it is described in the docum
 ## 2. Functional Requirements
 
 | Requirement | FinMatrix Copilot Approach | Status |
-
 |---|---|---|
 | Address a real financial problem | Help SMEs examine financial records, explore scenarios, and understand financial information. | Implemented scope; validate against the current application |
 | Financial data processing | Normalize and validate supported financial inputs before analysis. | Verify against current code |
@@ -32,7 +31,6 @@ A feature is not considered complete simply because it is described in the docum
 ## 3. Technical and Security Requirements
 
 | Requirement | Planned or Existing Approach | Status |
-
 |---|---|---|
 | Clear system architecture | Document the main modules and data flow in `docs/architecture.md`. | Documentation prepared; verify against code |
 | Reproducible setup | Maintain dependency and configuration instructions. | Verify setup on a clean environment |
@@ -50,7 +48,6 @@ A feature is not considered complete simply because it is described in the docum
 The following items should be checked against the official rules for the selected competition track and the latest submission instructions.
 
 | Deliverable | FinMatrix Copilot Material | Status |
-
 |---|---|---|
 | Project source code | GitHub repository | Verify repository completeness and access |
 | Architecture and core design | `docs/architecture.md` and relevant source modules | Review before submission |
