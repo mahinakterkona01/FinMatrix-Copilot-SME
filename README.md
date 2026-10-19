@@ -87,7 +87,7 @@ FinMatrix Copilot is a prototype for AI-assisted financial decision support. Its
 
 Security, authentication, and deployment readiness should be assessed against the actual implementation rather than inferred from the documentation alone.
 
-[**Live Demo**](https://finmatrix-copilot-sme-fzqfjy94f6marvqjc4phwu.streamlit.app/)
+**Streamlit App link :**[**FinMatrix Copilot**](https://finmatrix-copilot-sme-fzqfjy94f6marvqjc4phwu.streamlit.app/)
 
 ## Built With
 
