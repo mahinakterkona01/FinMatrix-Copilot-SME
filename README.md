@@ -3,7 +3,7 @@
 **AI-Powered Financial Intelligence for SMEs**.
 
 **Team FinMatrixDUO**
-*Shenzhen FinTechathon 2026 Ã‚Â· International Track*
+*Shenzhen FinTechathon 2026 · International Track*
 
 ---
 
@@ -17,7 +17,7 @@ We are a student team exploring how AI and financial analytics can help small an
 | Azmain Alam Khan | Team Member | Actual responsibilities in development, UI, testing, and research |
 
 Together, we are developing FinMatrix Copilot as part of the Shenzhen FinTechathon 2026 International Track.
-*Shenzhen FinTechathon 2026 Ã‚Â· International Track*
+*Shenzhen FinTechathon 2026 · International Track*
 
 [Live Demo](https://finmatrix-copilot-sme-fzqfjy94f6marvqjc4phwu.streamlit.app/) | [GitHub Repository](https://github.com/mahinakterkona01/FinMatrix-Copilot-SME)
 [GitHub Repository](https://github.com/mahinakterkona01/FinMatrix-Copilot-SME)
@@ -34,17 +34,17 @@ FinMatrix Copilot is a Streamlit-based financial decision-support application th
 
 Our goal is to help business owners explore their financial data, identify potential issues, understand possible outcomes, and make better-informed decisionsÃ¢â‚¬â€with calculations and evidence that can be reviewed rather than blindly trusting an AI response.
 
-Developed around the theme **Ã¢â‚¬Å“AI as a Financial Participant,Ã¢â‚¬Â** our project explores how AI can contribute to everyday financial workflows while keeping people responsible for the final decisions.
+Developed around the theme **“AI as a Financial Participant,Ã¢â‚¬Â** our project explores how AI can contribute to everyday financial workflows while keeping people responsible for the final decisions.
 
 ## What We Have Built
 
-- **Financial data analysis** Ã¢â‚¬â€ We developed tools to process and normalize financial records so users can work with more consistent data.
-- **Cash-flow insights** Ã¢â‚¬â€ We incorporated financial analysis to help users examine money coming in and going out and understand their cash position.
-- **Financial scenario calculations** Ã¢â‚¬â€ We built tools for exploring how changes in financial assumptions can affect estimated outcomes.
-- **Invoice discounting calculations** Ã¢â‚¬â€ We included a calculator to explore the potential cost and implications of receiving invoice payments early.
-- **AI-assisted financial queries** Ã¢â‚¬â€ We developed a modular Copilot workflow that can use application logic and a configurable language-model integration.
-- **Policy and document retrieval** Ã¢â‚¬â€ We implemented retrieval components to search a configured knowledge base for information relevant to a user's question.
-- **Reporting and safeguards** Ã¢â‚¬â€ We worked on report generation, input validation, AI guardrails, and security-related checks to make the application easier to inspect and evaluate.
+- **Financial data analysis** - We developed tools to process and normalize financial records so users can work with more consistent data.
+- **Cash-flow insights** - We incorporated financial analysis to help users examine money coming in and going out and understand their cash position.
+- **Financial scenario calculations** - We built tools for exploring how changes in financial assumptions can affect estimated outcomes.
+- **Invoice discounting calculations** - We included a calculator to explore the potential cost and implications of receiving invoice payments early.
+- **AI-assisted financial queries** - We developed a modular Copilot workflow that can use application logic and a configurable language-model integration.
+- **Policy and document retrieval** - We implemented retrieval components to search a configured knowledge base for information relevant to a user's question.
+- **Reporting and safeguards** - We worked on report generation, input validation, AI guardrails, and security-related checks to make the application easier to inspect and evaluate.
 
 Feature availability may depend on the data provided and the application's configuration. External AI responses require a working, configured provider.
 
@@ -98,4 +98,4 @@ Security, authentication, and deployment readiness should be assessed against th
 *We are building FinMatrix Copilot to make financial information easier to understand and use. The project is an evolving prototype, and its results should be reviewed before being used in real financial decisions.*
 
 **Team:** FinMatrixDUO
-**Competition:** Shenzhen FinTechathon 2026 Ã¢â‚¬â€ International Track
+**Competition:** Shenzhen FinTechathon 2026 . International Track
