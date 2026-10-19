@@ -13,9 +13,27 @@ except Exception:
     pass
 
 
+def _setting(name, default=""):
+    """Read environment configuration first, then Streamlit Cloud Secrets."""
+    value = os.getenv(name)
+    if value is not None and value.strip():
+        return value.strip()
+    try:
+        import streamlit as st
+        value = st.secrets.get(name, default)
+        return str(value).strip() if value is not None else default
+    except Exception:
+        return default
+
+
 def _provider():
-    """Return the explicitly selected language-model provider."""
-    return os.getenv("FINMATRIX_LLM_PROVIDER", "openai").strip().lower()
+    """Return the selected provider, inferring Groq when only its key is set."""
+    selected = _setting("FINMATRIX_LLM_PROVIDER", "").lower()
+    if selected:
+        return selected
+    if _setting("GROQ_API_KEY"):
+        return "groq"
+    return "openai"
 
 
 def is_enabled():
@@ -31,10 +49,13 @@ def is_enabled():
             ).strip())
         )
 
+    if provider == "groq":
+        return bool(_setting("GROQ_API_KEY"))
+
     if provider == "openai":
         return (
-            os.getenv("FINMATRIX_ENABLE_OPENAI", "").strip().lower() == "true"
-            and bool(os.getenv("OPENAI_API_KEY", "").strip())
+            _setting("FINMATRIX_ENABLE_OPENAI").lower() == "true"
+            and bool(_setting("OPENAI_API_KEY"))
         )
 
     return False
@@ -74,6 +95,32 @@ def _generate_text(instructions, input_text, max_output_tokens, timeout):
             message = payload.get("message", {})
             output = message.get("content") if isinstance(message, dict) else None
 
+            if not isinstance(output, str) or not output.strip():
+                return None
+            return output.strip()
+
+        if provider == "groq":
+            from openai import OpenAI
+
+            client = OpenAI(
+                api_key=_setting("GROQ_API_KEY"),
+                base_url="https://api.groq.com/openai/v1",
+                timeout=float(timeout),
+                max_retries=0,
+            )
+            response = client.chat.completions.create(
+                model=_setting("GROQ_MODEL", "openai/gpt-oss-20b"),
+                messages=[
+                    {"role": "system", "content": str(instructions)},
+                    {"role": "user", "content": str(input_text)},
+                ],
+                max_tokens=int(max_output_tokens),
+            )
+            choices = getattr(response, "choices", [])
+            if not choices:
+                return None
+            message = getattr(choices[0], "message", None)
+            output = getattr(message, "content", None)
             if not isinstance(output, str) or not output.strip():
                 return None
             return output.strip()
